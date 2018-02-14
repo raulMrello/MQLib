@@ -11,14 +11,17 @@ Para su funcionamiento cuenta con dos utilidades básicas:
 - Módulo List: que permite crear listas doblemente enlazadas de items (donde cada item es un puntero a un objeto).
 - Módulo Heap: que permite gestionar diferentes tipos de memoria dinámica (malloc, memoryPool, etc...)
 
-- Versión 13 Feb 2018
+- Versión 14 Feb 2018
   
 ## Changelog
 
-*13.02.2018*
->**"Compatibilidad MBED y ESP-IDF"**
+*14.02.2018*
+>**"Cambio miembro 'name' en 'Topic' para que utilice su propio espacio de trabajo"**
 >
-- [x] Compatibilizo para que sea funcional en ambas plataformas.
+- [x] @14Feb2018.001: 'name' cambia de const char* a char*
+- [x] @14Feb2018.002: se reserva espacio para el nombre del topic
+- [x] @14Feb2018.003: elimina un topic de la lista si se queda sin suscriptores.
+
   
 
 ----------------------------------------------------------------------------------------------
