@@ -15,6 +15,13 @@ Para su funcionamiento cuenta con dos utilidades básicas:
   
 ## Changelog
 
+*21.02.2018*
+>**"Actualizo List.hpp a @21Feb2018"**
+>
+- [x] @21Feb2018.001: Modificación en List.hpp
+
+  
+
 *14.02.2018*
 >**"Cambio miembro 'name' en 'Topic' para que utilice su propio espacio de trabajo"**
 >

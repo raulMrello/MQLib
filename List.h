@@ -2,7 +2,7 @@
  * List.h
  *
  *
- *  Versión: 2 Feb 2018
+ *  Versión: 21 Feb 2018
  *  Author: raulMrello
  *
  * 	List es una librería que permite manejar listas de objetos doblemente enlazadas. La lista puede ser limitada en 
