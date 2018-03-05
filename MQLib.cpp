@@ -1,7 +1,7 @@
 /*
  * MQLib.cpp
  *
- *  Versión: 13 Feb 2018
+ *  Versión: 05 Mar 2018
  *  Author: raulMrello
  *
  */

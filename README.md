@@ -11,9 +11,18 @@ Para su funcionamiento cuenta con dos utilidades básicas:
 - Módulo List: que permite crear listas doblemente enlazadas de items (donde cada item es un puntero a un objeto).
 - Módulo Heap: que permite gestionar diferentes tipos de memoria dinámica (malloc, memoryPool, etc...)
 
-- Versión 14 Feb 2018
+- Versión 05 Mar 2018
   
 ## Changelog
+
+
+*05.03.2018*
+>**"Corrijo bug en MQLib.h ver @05Mar2018.001"**
+>
+- [x] @05Mar2018.001: Corrijo bug, ya que no evaluaba wildcards en tokens que no fueran el campo numérico.
+
+  
+
 
 *21.02.2018*
 >**"Actualizo List.hpp a @21Feb2018"**

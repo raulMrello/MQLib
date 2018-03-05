@@ -1,7 +1,7 @@
 /*
  * MQLib.h
  *
- *  Versión: 21 Feb 2018
+ *  Versión: 05 Mar 2018
  *  Author: raulMrello
  *
  *	-------------------------------------------------------------------------------------------------------------------
@@ -10,6 +10,7 @@
  *	- Cambia la descripción de <name> en <struct Topic> para que pase de un <const char*> a un <char*> y que en el servicio
  *	MQBroker::subscribeReq se reserve espacio para copiar el topic que se desea, de esa forma no es necesario prepararlo
  *	externamente y puede ser liberado insitu por la propia librería MQLib.
+ *  - @05Mar2018.001 verifico wildcards en tokens de cualquier posición (soluciona bug)
  *  - @21Feb2018.001 en List.hpp sustituyo por getNextItem para asegurar que _search se posiciona correctamente
  *	- @14Feb2018.001: 'name' cambia de const char* a char*
  *	- @14Feb2018.002: se reserva espacio para el nombre del topic
@@ -695,15 +696,27 @@ private:
             } 
             // si no es un campo extendido, busca el texto
             else{
-            	MQ_DEBUG_TRACE("\r\n[MQLib]\t Analizando tokenX. Buscando token para delimitadores (%d,%d)", from, to);
-                for(int i=0;i<(_token_provider_count - WildcardCOUNT);i++){
-                    // si encuentra el token... actualiza el id
-                    if(strncmp(_token_provider[i], &name[from], to-from)==0){
-                    	MQ_DEBUG_TRACE("\r\n[MQLib]\t Analizando tokenX. Encontrado token [%s]", _token_provider[i]);
-                        token  = i + WildcardCOUNT;
-                        break;
-                    }
-                }                  
+            	// @05Mar2018.001 Verifico que sea un wildcard...
+            	// chequea si es un wildcard
+				if(strncmp(&name[from], "+", to-from)==0){
+					MQ_DEBUG_TRACE("\r\n[MQLib]......... Detectado wildcard (+) en delimitadores (%d,%d)\r\n", from, to);
+					token = WildcardAny;
+				}            
+				else if(strncmp(&name[from], "#", to-from)==0){
+					MQ_DEBUG_TRACE("\r\n[MQLib]......... Detectado wildcard (#) en delimitadores (%d,%d)\r\n", from, to);
+					token = WildcardAll;
+				}
+				else{            	               
+					MQ_DEBUG_TRACE("\r\n[MQLib]......... Analizando tokenX. Buscando token para delimitadores (%d,%d)\r\n", from, to);
+					for(int i=0;i<(_token_provider_count - WildcardCOUNT);i++){
+						// si encuentra el token... actualiza el id
+						if(strncmp(_token_provider[i], &name[from], to-from)==0){
+							MQ_DEBUG_TRACE("\r\n[MQLib]......... Analizando tokenX. Encontrado token [%s]\r\n", _token_provider[i]);
+							token  = i + WildcardCOUNT;
+							break;
+						}
+					}                  
+				}                
                 id->tk[pos] = (MQ::token_t)(token);
             }
             // pasa al siguiente campo
