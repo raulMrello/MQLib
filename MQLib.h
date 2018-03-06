@@ -1,7 +1,7 @@
 /*
  * MQLib.h
  *
- *  Versión: 05 Mar 2018
+ *  Versión: 06 Mar 2018
  *  Author: raulMrello
  *
  *	-------------------------------------------------------------------------------------------------------------------
@@ -10,6 +10,9 @@
  *	- Cambia la descripción de <name> en <struct Topic> para que pase de un <const char*> a un <char*> y que en el servicio
  *	MQBroker::subscribeReq se reserve espacio para copiar el topic que se desea, de esa forma no es necesario prepararlo
  *	externamente y puede ser liberado insitu por la propia librería MQLib.
+ *  - @06Mar2018.001 Añado lista de operaciones pendientes, así como servicios privados 'addPendingRequest' y
+ *  				 'processPendingRequests'. Las esperas en el mutex no son bloqueantes. Esto permite que los suscriptores
+ *  				 puedan utilizar la publicación y/o suscripción sin quedarse bloqueados de forma permanente.
  *  - @05Mar2018.001 verifico wildcards en tokens de cualquier posición (soluciona bug)
  *  - @21Feb2018.001 en List.hpp sustituyo por getNextItem para asegurar que _search se posiciona correctamente
  *	- @14Feb2018.001: 'name' cambia de const char* a char*
@@ -130,7 +133,7 @@ enum ErrorResult{
 /** @struct MQ::topic_t
  *  @brief Tipo definido para definir el identificador de un topic
  */
-#if __MBED__ == 1    
+#if __MBED__ == 1
 __packed struct topic_t{
     uint8_t tk[MQ::MAX_TOKEN_LEVEL+1];
 };
@@ -140,7 +143,7 @@ struct __packed topic_t{
     uint8_t tk[MQ::MAX_TOKEN_LEVEL+1];
 };
 #endif
- 
+
 
 
 /** @struct Topic
@@ -186,12 +189,14 @@ public:
      *  @return Código de error
      */
     static int32_t start(const char** token_list, uint32_t token_count, uint8_t max_len_of_name, bool defdbg = false) {
+    	int32_t rc = SUCCESS;
+    	_mutex.lock(osWaitForever);
         // ajusto parámetros por defecto 
     	_defdbg = defdbg;
         _max_name_len = max_len_of_name-1;
         _tokenlist_internal = false;
         _token_provider = token_list;
-        MQ_DEBUG_TRACE("\r\n[MQLib]\t Iniciando Broker...");
+        MQ_DEBUG_TRACE("[MQLib]......... Iniciando Broker...\r\n");
         // copio el número de tokens y reservo los wildcard (n.a.,+,#) con valores 0,1,2
         _token_provider_count = token_count + WildcardCOUNT;
         if(!_token_provider || token_count == 0){
@@ -200,31 +205,37 @@ public:
             _token_provider_count = WildcardCOUNT;
             _token_provider = (const char**)Heap::memAlloc(token_count * sizeof(const char*));
             if(!_token_provider){
-                return NULL_POINTER;
+                rc = NULL_POINTER; goto __start_exit;
             }
         }
         
+        // creo lista de solicitudes pendientes
+        _pending_list = new List<PendingRequest_t>();
+        MBED_ASSERT(_pending_list);
+
         // si hay un número de tokens mayor que el tamaño que lo puede alojar, devuelve error:
         // ej: token_count = 500 con token_t = uint8_t, que sólo puede codificar hasta 256 valores.
         if((_token_provider_count >> (8*sizeof(MQ::token_t))) > 0){
-            return OUT_OF_BOUNDS;
+            rc = OUT_OF_BOUNDS; goto __start_exit;
         }
         
         // si no hay lista inicial, se crea...
         if(!_topic_list){
-            _mutex.lock(osWaitForever);
+
             _topic_list = new List<MQ::Topic>();
 			if(!_topic_list){
-				_mutex.unlock();
-				return OUT_OF_MEMORY;
+				rc = OUT_OF_MEMORY; goto __start_exit;
 			}
 			if(token_count > 0){
 				_topic_list->setLimit(token_count);
 			}
-            _mutex.unlock();
-			return SUCCESS;
+			rc = SUCCESS; goto __start_exit;
         }
-		return EXISTS;
+		rc = EXISTS; goto __start_exit;
+
+__start_exit:
+	_mutex.unlock();
+	return rc;
     }
 
 
@@ -241,9 +252,10 @@ public:
      *  @brief Recibe una solicitud de suscripción a un topic
      *  @param name Nombre del topic
      *  @param subscriber Manejador de las actualizaciones del topic
+     *  @param use_lock Flag para utilizar el bloqueo por mutex
      *  @return Resultado
      */
-    static int32_t subscribeReq(const char* name, MQ::SubscribeCallback *subscriber){
+    static int32_t subscribeReq(const char* name, MQ::SubscribeCallback *subscriber, bool use_lock = true){
         int32_t err;
         if(!_topic_list){
             return DEINIT;
@@ -252,9 +264,16 @@ public:
         if(strlen(name) > _max_name_len){
             return OUT_OF_BOUNDS;
         }
-        MQ_DEBUG_TRACE("\r\n[MQLib]\t Iniciando suscripción a [%s]", name);
+
+        MQ_DEBUG_TRACE("[MQLib]......... Iniciando suscripción a [%s]\r\n", name);
+
         // Inicia la búsqueda del topic para ver si ya existe
-        _mutex.lock(osWaitForever);
+        if(use_lock){
+			if(_mutex.lock(DefaultMutexTimeout) == osErrorTimeoutResource){
+				return addPendingRequest(ReqSubscribe, name, NULL, 0, NULL, subscriber);
+			}
+        }
+
         MQ::Topic * topic = findTopicByName(name);		
 		// si lo encuentra...
         if(topic){
@@ -263,29 +282,25 @@ public:
 			// si no existe, lo añade
 			if(!sbc){
 				err = topic->subscriber_list->addItem(subscriber);
-				_mutex.unlock();
-				return err;
+				goto _subscribe_exit;
 			}
 			// si existe, devuelve el error
-			MQ_DEBUG_TRACE("\r\n[MQLib]\t ERR_SUBSC. El suscriptor ya existe");
-			_mutex.unlock();
-            return (EXISTS);
+			MQ_DEBUG_TRACE("[MQLib]......... ERR_SUBSC. El suscriptor ya existe\r\n");
+			err = EXISTS; goto _subscribe_exit;
         }
 		
 		// si el topic no existe:
-        MQ_DEBUG_TRACE("\r\n[MQLib]\t Creando topic [%s]", name);
+        MQ_DEBUG_TRACE("[MQLib]......... Creando topic [%s]\r\n", name);
         // si la lista de tokens es automantenida, crea los ids de los tokens no existentes
         if(_tokenlist_internal){
             if(!generateTokens(name)){
-                _mutex.unlock();
-				return(OUT_OF_MEMORY);
+                err = OUT_OF_MEMORY; goto _subscribe_exit;
             }
         }
         // lo crea reservarvando espacio para el topic
         topic = (MQ::Topic*)Heap::memAlloc(sizeof(MQ::Topic));
         if(!topic){
-            _mutex.unlock();
-            return(OUT_OF_MEMORY);
+            err = OUT_OF_MEMORY; goto _subscribe_exit;
         }
         
         // se fijan los parámetros del token (delimitadores, id, nombre)
@@ -293,30 +308,30 @@ public:
         //@14Feb2018.002: se reserva espacio para el nombre del topic
         topic->name = (char*)Heap::memAlloc(strlen(name)+1);
         if(!topic->name){
-        	_mutex.unlock();
-        	return (OUT_OF_MEMORY);
+        	err = OUT_OF_MEMORY; goto _subscribe_exit;
         }
         strcpy(topic->name, name);
-        //
-
         createTopicId(&topic->id, name);
 
         // se crea la lista de suscriptores
         topic->subscriber_list = new List<MQ::SubscribeCallback>();
         if(!topic->subscriber_list){
-            _mutex.unlock();
-            return(OUT_OF_MEMORY);
+            err = OUT_OF_MEMORY; goto _subscribe_exit;
         }
         
         // y se añade el suscriptor
         if(topic->subscriber_list->addItem(subscriber) != SUCCESS){
-            _mutex.unlock();
-            return(OUT_OF_MEMORY);
+            err = OUT_OF_MEMORY; goto _subscribe_exit;
         }
         
         // se inserta en el árbol de topics
         err = _topic_list->addItem(topic);
-        _mutex.unlock();
+
+_subscribe_exit:
+		if(use_lock){
+			_mutex.unlock();
+			processPendingRequests();
+		}
         return err;
     }
 
@@ -325,9 +340,10 @@ public:
      *  @brief Recibe una solicitud de cancelación de suscripción a un topic
      *  @param name Nombre del topic
      *  @param subscriber Suscriptor a eliminar de la lista de suscripción
+     *  @param use_lock Flag para utilizar el bloqueo por mutex
      *  @return Resultado
      */
-    static int32_t unsubscribeReq (const char* name, MQ::SubscribeCallback *subscriber){
+    static int32_t unsubscribeReq (const char* name, MQ::SubscribeCallback *subscriber, bool use_lock = true){
 		int32_t err;
 		if(!_topic_list){
             return DEINIT;
@@ -336,31 +352,36 @@ public:
         if(strlen(name) > _max_name_len){
             return OUT_OF_BOUNDS;
         }
-        
-        _mutex.lock(osWaitForever);
+
+
+        // Inicia la búsqueda del topic para ver si ya existe
+        if(use_lock){
+			if(_mutex.lock(DefaultMutexTimeout) == osErrorTimeoutResource){
+				return addPendingRequest(ReqUnsubscribe, name, NULL, 0, NULL, subscriber);
+			}
+        }
+
+        // precargo posible error
+        err = NOT_FOUND;
+
         MQ::Topic * topic = findTopicByName(name);
-        if(!topic){
-            _mutex.unlock();
-            return NOT_FOUND;
+        if(topic){
+        	MQ::SubscribeCallback *sbc = topic->subscriber_list->searchItem(subscriber);
+			if(sbc){
+				err = topic->subscriber_list->removeItem(sbc);
+				//@14Feb2018.003: elimina un topic de la lista si se queda sin suscriptores.
+				if(topic->subscriber_list->getItemCount() == 0){
+					Heap::memFree(topic->name);
+					_topic_list->removeItem(topic);
+					Heap::memFree(topic);
+				}
+			}
         }
-		
-        MQ::SubscribeCallback *sbc = topic->subscriber_list->searchItem(subscriber);
-        if(!sbc){
-            _mutex.unlock();
-            return NOT_FOUND;
-        }
-		
-        err = topic->subscriber_list->removeItem(sbc);
 
-        //@14Feb2018.003: elimina un topic de la lista si se queda sin suscriptores.
-        if(topic->subscriber_list->getItemCount() == 0){
-        	Heap::memFree(topic->name);
-        	_topic_list->removeItem(topic);
-        	Heap::memFree(topic);
-        }
-        //
-
-        _mutex.unlock();
+		if(use_lock){
+			_mutex.unlock();
+			processPendingRequests();
+		}
 		return err;
     }
 	
@@ -371,10 +392,11 @@ public:
      *  @param data Mensaje
      *  @param datasize Tamaño del mensaje
      *  @param publisher Callback de notificación de la publicación
+     *  @param use_lock Flag para utilizar el bloqueo por mutex
 	 *	@return Resultado
      */
-    static int32_t publishReq (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher){	
-		if(!_topic_list){
+    static int32_t publishReq (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher, bool use_lock = true){
+    	if(!_topic_list){
             return DEINIT;
         }
         // si el nombre excede el tamaño máximo, no lo permite
@@ -382,38 +404,37 @@ public:
             return OUT_OF_BOUNDS;
         }
 
-        MQ_DEBUG_TRACE("\r\n[MQLib]\t Iniciando publicación en '%s' con '%d' datos.", name, datasize);
+        MQ_DEBUG_TRACE("[MQLib]......... Iniciando publicación en '%s' con '%d' datos\r\n", name, datasize);
+
+        // Inicia la búsqueda del topic para ver si ya existe
+        if(use_lock){
+			if(_mutex.lock(DefaultMutexTimeout) == osErrorTimeoutResource){
+				return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
+			}
+        }
 
 		// obtiene el identificador del topic a publicar
         MQ::topic_t topic_id;
         createTopicId(&topic_id, name);
-
-        // recorre la lista de topics buscando aquellos que coincidan, teniendo en cuenta el tamaño del token_id
-        // dado por _token_bits
-        _mutex.lock(osWaitForever);
         
         // copia el mensaje a enviar por si sufre modificaciones, no alterar el origen
         char* mem_data = (char*)Heap::memAlloc(datasize);
-        if(!mem_data){
-            _mutex.unlock();
-            MQ_DEBUG_TRACE("\r\n[MQLib]\t ERR_HEAP_ALLOC");
-            return NULL_POINTER;
-        }
+        MBED_ASSERT(mem_data);
         
-        MQ_DEBUG_TRACE("\r\n[MQLib]\t Buscando topic '%s' en la lista", name);
+        MQ_DEBUG_TRACE("[MQLib]......... Buscando topic '%s' en la lista\r\n", name);
         MQ::Topic* topic = _topic_list->getFirstItem();
         bool notify_subscriber = false;
         while(topic){
-        	MQ_DEBUG_TRACE("\r\n[MQLib]\t Comparando topic '%s' con '%s'", name, topic->name);
+        	MQ_DEBUG_TRACE("[MQLib]......... Comparando topic '%s' con '%s'\r\n", name, topic->name);
             // comprueba si el id coincide o si no se usa (=0)
             if(matchIds(&topic->id, &topic_id)){
-            	MQ_DEBUG_TRACE("\r\n[MQLib]\t Topic '%s' encontrado. Buscando suscriptores...", name);
+            	MQ_DEBUG_TRACE("[MQLib]......... Topic '%s' encontrado. Buscando suscriptores...\r\n", name);
                 // si coinciden, se invoca a todos los suscriptores                
                 MQ::SubscribeCallback *sbc = topic->subscriber_list->getFirstItem();
                 while(sbc){
                     // restaura el mensaje por si hubiera sufrido modificaciones en algún suscriptor
                     memcpy(mem_data, data, datasize);
-                    MQ_DEBUG_TRACE("\r\n[MQLib]\t Notificando topic update de '%s' al suscriptor %x", name, (uint32_t)sbc);
+                    MQ_DEBUG_TRACE("[MQLib]......... Notificando topic update de '%s' al suscriptor %x\r\n", name, (uint32_t)sbc);
                     notify_subscriber = true;
                     sbc->call(name, mem_data, datasize);
                     sbc = topic->subscriber_list->getNextItem();
@@ -423,8 +444,12 @@ public:
         }
         publisher->call(name, (notify_subscriber)? SUCCESS : NOT_FOUND);
         Heap::memFree(mem_data);
-        _mutex.unlock();
-        MQ_DEBUG_TRACE("\r\n[MQLib]\t Fin de la publicación del topic '%s'", name);
+        MQ_DEBUG_TRACE("[MQLib]......... Fin de la publicación del topic '%s'\r\n", name);
+
+        if(use_lock){
+			_mutex.unlock();
+			processPendingRequests();
+		}
 		return SUCCESS;
     }
 
@@ -541,6 +566,18 @@ private:
         WildcardCOUNT,
     };    
     
+    /** Lista de operaciones pendientes
+     *
+     */
+    enum PendingRequestType {
+    	ReqPublish=0, 	//!< ReqPublish Solicitud de publicación
+		ReqSubscribe,   //!< ReqSubscribe Solicitud de suscripción
+		ReqUnsubscribe, //!< ReqUnsubscribe Solicitud de unsuscripción
+    };
+
+    /** Máximo tiempo de espera en el mutex antes de crear solicitud pendiente */
+    static const uint32_t DefaultMutexTimeout = 100;
+
     /** Máximo número de tokens permitidos en topic provider auto-gestionado */
     static const uint16_t DefaultMaxNumTokenEntries = (256 - WildcardCOUNT);    
     
@@ -565,7 +602,24 @@ private:
     /** Límite de tamaño en nombres de topcis */
     static uint8_t _max_name_len;
  
+    /** Flag de depuración */
     static bool _defdbg;
+
+    /** Estructura de datos de una solicitud pendiente
+     *
+     */
+    struct PendingRequest_t{
+    	PendingRequestType type;
+    	char* topic;
+    	void *msg;
+    	uint32_t msg_len;
+    	SubscribeCallback *sub_cb;
+    	PublishCallback *pub_cb;
+    };
+
+    /** Lista de acciones pendientes por mutex bloqueado */
+    static List<PendingRequest_t> *_pending_list;
+
 
     /** @fn findTopicByName 
      *  @brief Busca un topic por medio de su nombre, descendiendo por la jerarquía hasta
@@ -635,7 +689,7 @@ private:
     static void createTopicId(MQ::topic_t* id, const char* name){
         uint8_t from = 0, to = 0;
         bool is_final = false;
-        MQ_DEBUG_TRACE("\r\n[MQLib]\t Generando ID para el topic [%s]", name);
+        MQ_DEBUG_TRACE("[MQLib]......... Generando ID para el topic [%s]\r\n", name);
         int pos = 0; 
         // Inicializo el contenido del identificador para marcar como no usado
         for(int i=0;i<MQ::MAX_TOKEN_LEVEL;i++){
@@ -645,17 +699,17 @@ private:
         // obtiene los delimitadores para buscar tokens
         getNextDelimiter(name, &from, &to, &is_final);
         while(from < to){
-        	MQ_DEBUG_TRACE("\r\n[MQLib]\t Procesando topic [%s], delimitadores (%d,%d)", name, from, to);
+        	MQ_DEBUG_TRACE("[MQLib]......... Procesando topic [%s], delimitadores (%d,%d)\r\n", name, from, to);
             uint32_t token = WildcardNotUsed;
             // chequea si es un campo extendido
             if(pos == AddrField){
                 // chequea si es un wildcard
                 if(strncmp(&name[from], "+", to-from)==0){
-                	MQ_DEBUG_TRACE("\r\n[MQLib]\t Detectado wildcard (+) en delimitadores (%d,%d)", from, to);
+                	MQ_DEBUG_TRACE("[MQLib]......... Detectado wildcard (+) en delimitadores (%d,%d)\r\n", from, to);
                     token = WildcardAny;
                 }            
                 else if(strncmp(&name[from], "#", to-from)==0){
-                	MQ_DEBUG_TRACE("\r\n[MQLib]\t Detectado wildcard (#) en delimitadores (%d,%d)", from, to);
+                	MQ_DEBUG_TRACE("[MQLib]......... Detectado wildcard (#) en delimitadores (%d,%d)\r\n", from, to);
                     token = WildcardAll;
                 } 
                 // en caso contrario...
@@ -663,7 +717,7 @@ private:
                     bool match = false;
                     // comprueba si viene precedido del wildcard de direccionamiento
                     if(name[0] == WildcardScope){
-                    	MQ_DEBUG_TRACE("\r\n[MQLib]\t Analizando token1. Detectado wildcard (@) en token0");
+                    	MQ_DEBUG_TRACE("[MQLib]......... Analizando token1. Detectado wildcard (@) en token0\r\n");
 						match = true;
 						break;
 					}
@@ -673,15 +727,15 @@ private:
                         char num[16];
                         strncpy(num, &name[from], to-from);
                         token = atoi(num);
-                        MQ_DEBUG_TRACE("\r\n[MQLib]\t Analizando token1. Detectado campo numérico [%d]", token);
+                        MQ_DEBUG_TRACE("[MQLib]......... Analizando token1. Detectado campo numérico [%d]\r\n", token);
                     }
                     // sino, busca el token
                     else{
-                    	MQ_DEBUG_TRACE("\r\n[MQLib]\t Analizando token1. No es un número, buscando token para delimitadores (%d,%d)", from, to);
+                    	MQ_DEBUG_TRACE("[MQLib]......... Analizando token1. No es un número, buscando token para delimitadores (%d,%d)\r\n", from, to);
                         for(int i=0;i<(_token_provider_count - WildcardCOUNT);i++){
                             // si encuentra el token... actualiza el id
                             if(strncmp(_token_provider[i], &name[from], to-from)==0){
-                            	MQ_DEBUG_TRACE("\r\n[MQLib]\t Analizando token1. Encontrado token [%s]", _token_provider[i]);
+                            	MQ_DEBUG_TRACE("[MQLib]......... Analizando token1. Encontrado token [%s]\r\n", _token_provider[i]);
                                 token  = i + WildcardCOUNT;
                                 break;
                             }
@@ -699,24 +753,24 @@ private:
             	// @05Mar2018.001 Verifico que sea un wildcard...
             	// chequea si es un wildcard
 				if(strncmp(&name[from], "+", to-from)==0){
-					MQ_DEBUG_TRACE("\r\n[MQLib]......... Detectado wildcard (+) en delimitadores (%d,%d)\r\n", from, to);
+					MQ_DEBUG_TRACE("[MQLib]......... Detectado wildcard (+) en delimitadores (%d,%d)\r\n", from, to);
 					token = WildcardAny;
-				}            
+				}
 				else if(strncmp(&name[from], "#", to-from)==0){
-					MQ_DEBUG_TRACE("\r\n[MQLib]......... Detectado wildcard (#) en delimitadores (%d,%d)\r\n", from, to);
+					MQ_DEBUG_TRACE("[MQLib]......... Detectado wildcard (#) en delimitadores (%d,%d)\r\n", from, to);
 					token = WildcardAll;
 				}
-				else{            	               
-					MQ_DEBUG_TRACE("\r\n[MQLib]......... Analizando tokenX. Buscando token para delimitadores (%d,%d)\r\n", from, to);
+				else{
+					MQ_DEBUG_TRACE("[MQLib]......... Analizando tokenX. Buscando token para delimitadores (%d,%d)\r\n", from, to);
 					for(int i=0;i<(_token_provider_count - WildcardCOUNT);i++){
 						// si encuentra el token... actualiza el id
 						if(strncmp(_token_provider[i], &name[from], to-from)==0){
-							MQ_DEBUG_TRACE("\r\n[MQLib]......... Analizando tokenX. Encontrado token [%s]\r\n", _token_provider[i]);
+							MQ_DEBUG_TRACE("[MQLib]......... Analizando tokenX. Encontrado token [%s]\r\n", _token_provider[i]);
 							token  = i + WildcardCOUNT;
 							break;
 						}
-					}                  
-				}                
+					}
+				}
                 id->tk[pos] = (MQ::token_t)(token);
             }
             // pasa al siguiente campo
@@ -777,11 +831,11 @@ private:
      */
     static bool matchIds(MQ::topic_t* found_id, MQ::topic_t* search_id){
         for(int i=0;i<MQ::MAX_TOKEN_LEVEL;i++){
-        	MQ_DEBUG_TRACE("\r\n[MQLib]\t Comparando token_%d...", i);
+        	MQ_DEBUG_TRACE("[MQLib]......... Comparando token_%d\r\n", i);
             if(i == AddrField){
                 uint32_t search_idex = (((uint32_t)search_id->tk[i]) << (8 * sizeof(MQ::token_t))) + search_id->tk[i+1];       
                 uint32_t found_idex = (((uint32_t)found_id->tk[i]) << (8 * sizeof(MQ::token_t))) + found_id->tk[i+1];
-                MQ_DEBUG_TRACE("\r\n[MQLib]\t El token_%d es un campo de dirección, comparando %d vs %d", i, found_idex, search_idex);
+                MQ_DEBUG_TRACE("[MQLib]......... El token_%d es un campo de dirección, comparando %d vs %d\r\n", i, found_idex, search_idex);
                 // si ha llegado al final de la cadena de búsqueda sin errores, es que coincide...
                 if(search_idex == WildcardNotUsed){
                     return true;
@@ -799,7 +853,7 @@ private:
                 i++;
             }
             else{
-            	MQ_DEBUG_TRACE("\r\n[MQLib]\t El token_%d es un campo normal, comparando %d vs %d", i, found_id->tk[i], search_id->tk[i]);
+            	MQ_DEBUG_TRACE("[MQLib]......... El token_%d es un campo normal, comparando %d vs %d\r\n", i, found_id->tk[i], search_id->tk[i]);
                 // si ha llegado al final de la cadena de búsqueda sin errores, es que coincide...
                 if(search_id->tk[i] == WildcardNotUsed){
                     return true;
@@ -819,6 +873,74 @@ private:
         // si llega a este punto es que coinciden todos los niveles
         return true;
     }         
+
+
+    /** Añade una operación a la lista de operaciones pendientes
+     *
+     *  @param type Tipo de operación
+     *  @param topic Nombre del topic
+     *  @param data Datos del mensaje (sólo para publicaciones)
+     *  @param datasize Tamaño de los datos del mensaje (sólo para publicaciones)
+     *  @param pub_cb Callback de publicación
+     *  @param sub_cb Callback de suscripción
+     *  @return Código de error
+     */
+    static int32_t addPendingRequest(PendingRequestType type, const char* topic, void* data, uint32_t datasize, PublishCallback *pub_cb, SubscribeCallback *sub_cb){
+    	PendingRequest_t* req = (PendingRequest_t*)Heap::memAlloc(sizeof(PendingRequest_t));
+    	MBED_ASSERT(req);
+    	req->topic = (char*)Heap::memAlloc(strlen(topic)+1);
+    	MBED_ASSERT(req->topic);
+    	strcpy(req->topic, topic);
+    	req->msg = data;
+    	req->msg_len = datasize;
+    	if(datasize){
+    		req->msg = (void*)Heap::memAlloc(datasize);
+    		MBED_ASSERT(req->msg);
+    		memcpy(req->msg, data, datasize);
+    		req->msg_len = datasize;
+    	}
+    	req->pub_cb = pub_cb;
+    	req->sub_cb = sub_cb;
+    	req->type = type;
+    	MQ_DEBUG_TRACE("[MQLib]......... Añadiendo solicitud pendiente tipo %d en topic %s\r\n", (int)req->type, req->topic);
+    	return _pending_list->addItem(req);
+    }
+
+
+    /** Procesa todas las operaciones pendientes, liberando los recursos asociados
+     *
+     */
+    static void processPendingRequests(){
+    	PendingRequest_t* req = _pending_list->getFirstItem();
+    	while(req){
+    		switch((int)req->type){
+    			case ReqSubscribe:{
+    				MQ_DEBUG_TRACE("[MQLib]......... Procesando solicitud pendiente tipo Subscribe (%d) en topic %s\r\n", (int)req->type, req->topic);
+    				subscribeReq(req->topic, req->sub_cb, false);
+    				break;
+    			}
+    			case ReqUnsubscribe:{
+    				MQ_DEBUG_TRACE("[MQLib]......... Procesando solicitud pendiente tipo Unsubscribe (%d) en topic %s\r\n", (int)req->type, req->topic);
+    				    				unsubscribeReq(req->topic, req->sub_cb, false);
+    				break;
+    			}
+    			case ReqPublish:{
+    				MQ_DEBUG_TRACE("[MQLib]......... Procesando solicitud pendiente tipo Publish (%d) en topic %s\r\n", (int)req->type, req->topic);
+					publishReq(req->topic, req->msg, req->msg_len, req->pub_cb, false);
+    				break;
+    			}
+    		}
+    		// libera los recursos
+    		if(req->msg){
+    			Heap::memFree(req->msg);
+    		}
+    		Heap::memFree(req->topic);
+    		_pending_list->removeItem(req);
+    		Heap::memFree(req);
+    		// Coge el siguiente elemento que volverá a ser el primero
+    		req = _pending_list->getFirstItem();
+    	}
+    }
 };
 
 

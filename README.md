@@ -16,6 +16,14 @@ Para su funcionamiento cuenta con dos utilidades básicas:
 ## Changelog
 
 
+*06.03.2018*
+>**"Corrijo bug en MQLib.h ver @06Mar2018.001 Operaciones retardadas por bloqueo en mutex"**
+>
+- [x] @06Mar2018.001: Corrijo bug, para habilitar operaciones retardadas debido a bloqueo en mutex.
+
+  
+
+
 *05.03.2018*
 >**"Corrijo bug en MQLib.h ver @05Mar2018.001"**
 >
