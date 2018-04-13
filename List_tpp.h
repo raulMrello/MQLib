@@ -1,7 +1,7 @@
 /*
  * List.tpp
  *
- *  Versión: 05 Mar 2018
+ *  Versión: 15 Mar 2018
  *  Author: raulMrello
  *
  *  Implementación de la librería List.

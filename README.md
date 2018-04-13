@@ -16,6 +16,22 @@ Para su funcionamiento cuenta con dos utilidades básicas:
 ## Changelog
 
 
+*13.04.2018*
+>**"Cambio WildcardScope"**
+>
+- [x] @13Abr2018.001 Cambio WildcardScope por WildcardScopeDev, WildcardScopeGroup y AddrField = 2 (antes 1)
+
+  
+
+
+*15.03.2018*
+>**"Creo clase MQBridge"**
+>
+- [x] @15Mar2018.001 Añado clase MQBridge para crear redirecciones de forma cómoda
+
+  
+
+
 *06.03.2018*
 >**"Corrijo bug en MQLib.h ver @06Mar2018.001 Operaciones retardadas por bloqueo en mutex"**
 >
