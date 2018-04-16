@@ -10,6 +10,7 @@
  *	- Cambia la descripción de <name> en <struct Topic> para que pase de un <const char*> a un <char*> y que en el servicio
  *	MQBroker::subscribeReq se reserve espacio para copiar el topic que se desea, de esa forma no es necesario prepararlo
  *	externamente y puede ser liberado insitu por la propia librería MQLib.
+ *  - @16Abr2018.001 Corrijo bug en la llamada a <start> ya que no se iniciaban bien los nuevos wildcards
  *  - @13Abr2018.001 Cambio WildcardScope por WildcardScopeDev, WildcardScopeGroup y AddrField = 2 (antes 1)
  *  - @15Mar2018.001 Añado clase MQBridge para crear redirecciones de forma cómoda
  *  - @06Mar2018.001 Añado lista de operaciones pendientes, así como servicios privados 'addPendingRequest' y
@@ -180,9 +181,7 @@ public:
      *  @return Código de error
      */
     static int32_t start(uint8_t max_len_of_name = DefaultMaxTopicNameLength, const char * wildcard_scope_dev = "/dev/", const char* wildcard_scope_group = "/group/", bool defdbg = false){
-    	WildcardScopeDev = wildcard_scope_dev;
-    	WildcardScopeGroup = wildcard_scope_group;
-        return start(0, 0, max_len_of_name, defdbg);
+        return start(0, 0, max_len_of_name, wildcard_scope_dev, wildcard_scope_group, defdbg);
     }
 
     /** @fn start
@@ -190,10 +189,14 @@ public:
      *  @param token_list Lista predefinida de tokens
 	 *	@param token_count Máximo número de tokens en la lista
      *  @param max_len_of_name Número de caracteres máximo que puede tener un topic (incluyendo '\0' final)
+     *  @param wildcard_scope_dev Token para identificador numérico de dispositivo
+     *  @param wildcard_scope_group Token para identificador numérico de grupo
      *  @param defdbg Flag para activar las trazas de depuración por defecto
      *  @return Código de error
      */
-    static int32_t start(const char** token_list, uint32_t token_count, uint8_t max_len_of_name = DefaultMaxTopicNameLength, bool defdbg = false) {
+    static int32_t start(const char** token_list, uint32_t token_count, uint8_t max_len_of_name = DefaultMaxTopicNameLength, const char * wildcard_scope_dev = "/dev/", const char* wildcard_scope_group = "/group/", bool defdbg = false) {
+    	WildcardScopeDev = wildcard_scope_dev;
+    	WildcardScopeGroup = wildcard_scope_group;
     	int32_t rc = SUCCESS;
     	_mutex.lock(osWaitForever);
         // ajusto parámetros por defecto 
@@ -726,7 +729,6 @@ private:
                     if(strstr(name, WildcardScopeDev) != NULL || strstr(name, WildcardScopeGroup) != NULL){
                     	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando token1. Detectado wildcardScope en token0");
 						match = true;
-						break;
 					}
                     // si es un campo numérico...
                     if(match){

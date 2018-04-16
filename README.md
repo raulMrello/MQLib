@@ -16,6 +16,14 @@ Para su funcionamiento cuenta con dos utilidades básicas:
 ## Changelog
 
 
+*16.04.2018*
+>**"Corrijo bug en Cambio WildcardScope"**
+>
+- [x] @16Abr2018.001 Corrijo fallo en la inicialización de los nuevos wildcards.
+
+  
+
+
 *13.04.2018*
 >**"Cambio WildcardScope"**
 >
