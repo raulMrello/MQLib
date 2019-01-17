@@ -161,7 +161,7 @@ void List<T>::removeAll(){
 
 //------------------------------------------------------------------------------------
 template<typename T>
-uint32_t List<T>::getItemCount(){
+uint32_t List<T>::getItemCount() {
     return _count;
 }
 

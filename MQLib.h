@@ -10,7 +10,6 @@
  *	- Cambia la descripción de <name> en <struct Topic> para que pase de un <const char*> a un <char*> y que en el servicio
  *	MQBroker::subscribeReq se reserve espacio para copiar el topic que se desea, de esa forma no es necesario prepararlo
  *	externamente y puede ser liberado insitu por la propia librería MQLib.
- *  - @16Abr2018.001 Corrijo bug en la llamada a <start> ya que no se iniciaban bien los nuevos wildcards
  *  - @13Abr2018.001 Cambio WildcardScope por WildcardScopeDev, WildcardScopeGroup y AddrField = 2 (antes 1)
  *  - @15Mar2018.001 Añado clase MQBridge para crear redirecciones de forma cómoda
  *  - @06Mar2018.001 Añado lista de operaciones pendientes, así como servicios privados 'addPendingRequest' y
@@ -180,7 +179,7 @@ public:
      *  @param defdbg Flag para activar las trazas de depuración por defecto
      *  @return Código de error
      */
-    static int32_t start(uint8_t max_len_of_name = DefaultMaxTopicNameLength, const char * wildcard_scope_dev = "/dev/", const char* wildcard_scope_group = "/group/", bool defdbg = false){
+    static int32_t start(uint8_t max_len_of_name, const char * wildcard_scope_dev, const char* wildcard_scope_group, bool defdbg = false){
         return start(0, 0, max_len_of_name, wildcard_scope_dev, wildcard_scope_group, defdbg);
     }
 
@@ -194,7 +193,7 @@ public:
      *  @param defdbg Flag para activar las trazas de depuración por defecto
      *  @return Código de error
      */
-    static int32_t start(const char** token_list, uint32_t token_count, uint8_t max_len_of_name = DefaultMaxTopicNameLength, const char * wildcard_scope_dev = "/dev/", const char* wildcard_scope_group = "/group/", bool defdbg = false) {
+    static int32_t start(const char** token_list, uint32_t token_count, uint8_t max_len_of_name, const char * wildcard_scope_dev, const char* wildcard_scope_group, bool defdbg = false) {
     	WildcardScopeDev = wildcard_scope_dev;
     	WildcardScopeGroup = wildcard_scope_group;
     	int32_t rc = SUCCESS;
@@ -930,7 +929,7 @@ private:
     			}
     			case ReqUnsubscribe:{
     				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando solicitud pendiente tipo Unsubscribe (%d) en topic %s", (int)req->type, req->topic);
-    				    				unsubscribeReq(req->topic, req->sub_cb, false);
+    				unsubscribeReq(req->topic, req->sub_cb, false);
     				break;
     			}
     			case ReqPublish:{
@@ -940,7 +939,7 @@ private:
     			}
     		}
     		// libera los recursos
-    		if(req->msg){
+    		if(req->msg && req->msg_len > 0){
     			Heap::memFree(req->msg);
     		}
     		Heap::memFree(req->topic);
