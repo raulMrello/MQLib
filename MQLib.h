@@ -179,42 +179,19 @@ public:
      *  @param defdbg Flag para activar las trazas de depuración por defecto
      *  @return Código de error
      */
-    static int32_t start(uint8_t max_len_of_name, const char * wildcard_scope_dev, const char* wildcard_scope_group, bool defdbg = false){
-        return start(0, 0, max_len_of_name, wildcard_scope_dev, wildcard_scope_group, defdbg);
-    }
-
-    /** @fn start
-     *  @brief Inicializa el broker MQ estableciendo la siguiente configuración:
-     *  @param token_list Lista predefinida de tokens
-	 *	@param token_count Máximo número de tokens en la lista
-     *  @param max_len_of_name Número de caracteres máximo que puede tener un topic (incluyendo '\0' final)
-     *  @param wildcard_scope_dev Token para identificador numérico de dispositivo
-     *  @param wildcard_scope_group Token para identificador numérico de grupo
-     *  @param defdbg Flag para activar las trazas de depuración por defecto
-     *  @return Código de error
-     */
-    static int32_t start(const char** token_list, uint32_t token_count, uint8_t max_len_of_name, const char * wildcard_scope_dev, const char* wildcard_scope_group, bool defdbg = false) {
-    	WildcardScopeDev = wildcard_scope_dev;
-    	WildcardScopeGroup = wildcard_scope_group;
+    static int32_t start(uint8_t max_len_of_name, bool defdbg = false){
     	int32_t rc = SUCCESS;
-    	_mutex.lock(osWaitForever);
+    	_mutex.lock();
         // ajusto parámetros por defecto 
     	_defdbg = defdbg;
         _max_name_len = max_len_of_name-1;
-        _tokenlist_internal = false;
-        _token_provider = token_list;
         DEBUG_TRACE_I(_defdbg,"[MQLib].........", "Iniciando Broker...");
-        // copio el número de tokens y reservo los wildcard (n.a.,+,#) con valores 0,1,2
-        _token_provider_count = token_count + WildcardCOUNT;
-        if(!_token_provider || token_count == 0){
-            _tokenlist_internal = true;
-            token_count = DefaultMaxNumTokenEntries;
-            _token_provider_count = WildcardCOUNT;
-            _token_provider = (const char**)Heap::memAlloc(token_count * sizeof(const char*));
-            if(!_token_provider){
-                rc = NULL_POINTER; goto __start_exit;
-            }
-        }
+		_tokenlist_internal = true;
+		_token_provider_count = WildcardCOUNT;
+		_token_provider = (const char**)Heap::memAlloc(DefaultMaxNumTokenEntries * sizeof(const char*));
+		if(!_token_provider){
+			rc = NULL_POINTER; goto __start_exit;
+		}
         
         // creo lista de solicitudes pendientes
         _pending_list = new List<PendingRequest_t>();
@@ -222,7 +199,7 @@ public:
 
         // si hay un número de tokens mayor que el tamaño que lo puede alojar, devuelve error:
         // ej: token_count = 500 con token_t = uint8_t, que sólo puede codificar hasta 256 valores.
-        if((_token_provider_count >> (8*sizeof(MQ::token_t))) > 0){
+        if(((DefaultMaxNumTokenEntries+WildcardCOUNT) >> (8*sizeof(MQ::token_t))) > 1){
             rc = OUT_OF_BOUNDS; goto __start_exit;
         }
         
@@ -233,9 +210,7 @@ public:
 			if(!_topic_list){
 				rc = OUT_OF_MEMORY; goto __start_exit;
 			}
-			if(token_count > 0){
-				_topic_list->setLimit(token_count);
-			}
+			_topic_list->setLimit(DefaultMaxNumTopics);
 			rc = SUCCESS; goto __start_exit;
         }
 		rc = EXISTS; goto __start_exit;
@@ -420,6 +395,17 @@ _subscribe_exit:
 			}
         }
 
+        // si la lista de tokens es automantenida, crea los ids de los tokens no existentes
+        if(_tokenlist_internal){
+            if(!generateTokens(name)){
+                if(use_lock){
+        			_mutex.unlock();
+        			processPendingRequests();
+        		}
+        		return OUT_OF_MEMORY;
+            }
+        }
+
 		// obtiene el identificador del topic a publicar
         MQ::topic_t topic_id;
         createTopicId(&topic_id, name);
@@ -479,76 +465,30 @@ _subscribe_exit:
      */
     static void getTopicNameReq(char* name, uint8_t len, MQ::topic_t* id){
         strcpy(name, "");
-		if((_token_provider && _token_provider_count == 0) || (!_token_provider && _token_provider_count <= WildcardCOUNT)){
-            return;
-        }
 
         // recorre campo a campo verificando los tokens
         for(int i=0;i<MQ::MAX_TOKEN_LEVEL;i++){
             uint32_t idex;
-            // si es un campo de tamaño normal token_t
-            if(i != AddrField){
-                // obtiene el token_id
-                idex = id->tk[i];
-                // si ha llegado al final del topic, termina
-                if(idex == WildcardNotUsed){
-                    // una vez finalizado, debe borrar el último caracter '/' insertado
-                    name[strlen(name)-1] = 0;                        
-                    return;
-                }
-                // si son wildcards, los escribe
-                else if(idex == WildcardAny){
-                    strcat(name, "+/");
-                }
-                else if(idex == WildcardAll){
-                    strcat(name, "#/");
-                }
-                // en otro caso, escribe el token correspondiente
-                else{
-                    strcat(name, _token_provider[idex]);
-                    strcat(name, "/");
-                }
-            }
-            // si es el campo de tamaño ampliado
-            else{
-                // calcula el identificador extendido
-                idex = (((uint32_t)id->tk[i]) << (8 * sizeof(MQ::token_t))) + id->tk[i+1];       
-                // comprueba si el nombre contiene el wildcard de direccionamiento
-                if(strstr(name, WildcardScopeDev) != NULL || strstr(name, WildcardScopeGroup) != NULL){
-                    // en ese caso, añado el nombre numérico
-                    char num[16];
-                    sprintf(num, "%d/", idex);
-                    strcat(name, num);
-                }
-                // si no contiene el wildcard de direccionamiento, comprueba que si está fuera de rango
-                else if(idex >= (_token_provider_count - WildcardCOUNT)){
-                    strcpy(name, "");
-                    return;
-                }
-                // sino, devuelve el texto correspondiente
-                else{
-                    // si ha llegado al final del topic, termina
-                    if(idex == WildcardNotUsed){
-                        // una vez finalizado, debe borrar el último caracter '/' insertado
-                        name[strlen(name)-1] = 0;                        
-                        return;
-                    }
-                    // si son wildcards, los escribe
-                    else if(idex == WildcardAny){
-                        strcat(name, "+/");
-                    }
-                    else if(idex == WildcardAll){
-                        strcat(name, "#/");
-                    }
-                    // en otro caso, escribe el token correspondiente
-                    else{
-                        strcat(name, _token_provider[idex]);
-                        strcat(name, "/");
-                    }                    
-                }                                
-                // descarto el campo siguiente
-                i++;
-            }
+			// obtiene el token_id
+			idex = id->tk[i];
+			// si ha llegado al final del topic, termina
+			if(idex == WildcardNotUsed){
+				// una vez finalizado, debe borrar el último caracter '/' insertado
+				name[strlen(name)-1] = 0;
+				return;
+			}
+			// si son wildcards, los escribe
+			else if(idex == WildcardAny){
+				strcat(name, "+/");
+			}
+			else if(idex == WildcardAll){
+				strcat(name, "#/");
+			}
+			// en otro caso, escribe el token correspondiente
+			else{
+				strcat(name, _token_provider[idex]);
+				strcat(name, "/");
+			}
         }
         // una vez finalizado, debe borrar el último caracter '/' insertado
         name[strlen(name)-1] = 0;
@@ -561,7 +501,18 @@ _subscribe_exit:
      */
     static uint8_t getMaxTopicLenReq(){
         return _max_name_len;
-    }               
+    }
+
+
+    /** @fn getInternalTokenList
+     *  @brief Obtiene la lista de tokens interna
+     *  @param tklist Lista de tokens
+     *  @param tkcount Número de tokens en la lista
+     */
+    static void getInternalTokenList(const char** &tklist, uint32_t &tkcount){
+        tklist = _token_provider;
+        tkcount = _token_provider_count - WildcardCOUNT;
+    }
 
 private:
 	
@@ -588,14 +539,10 @@ private:
 
     /** Máximo número de tokens permitidos en topic provider auto-gestionado */
     static const uint16_t DefaultMaxNumTokenEntries = (256 - WildcardCOUNT);    
-    
-    /** Posición del campo de tamaño especial uint16_t */
-    static const uint8_t AddrField = 2;
-    
-    /** Wildcard asociado a un token de ámbito o direccionamiento seguido de un campo numérico */
-    static const char* WildcardScopeDev;
-    static const char* WildcardScopeGroup;
-	
+
+    /** Máximo número de topics permitidos */
+    static const uint16_t DefaultMaxNumTopics = 256;
+
     /** Lista de topics registrados */
     static List<MQ::Topic> * _topic_list;
 
@@ -663,9 +610,10 @@ private:
         getNextDelimiter(name, &from, &to, &is_final);
         while(from < to){
             bool exists = false;
-            for(int i = WildcardCOUNT;i <_token_provider_count;i++){
+            for(int i = 0;i <_token_provider_count-WildcardCOUNT;i++){
                 // si el token ya existe o es un wildcard, pasa al siguiente
-                if(name[from] == '#' || name[from] == '+' || strncmp(_token_provider[i-WildcardCOUNT], &name[from], to-from)==0){
+                if(name[from] == '#' || name[from] == '+' || strncmp(_token_provider[i], &name[from], to-from)==0){
+                	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "El token ya existe");
                     exists = true;
                     break;
                 }
@@ -680,6 +628,7 @@ private:
                 strncpy(new_token, &name[from], (to-from)); new_token[to-from] = 0;
                 _token_provider[_token_provider_count-WildcardCOUNT] = new_token;
                 _token_provider_count++;
+                DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Añadido token %s", new_token);
             }
             from = to+1;
             getNextDelimiter(name, &from, &to, &is_final);
@@ -710,77 +659,29 @@ private:
         while(from < to){
         	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando topic [%s], delimitadores (%d,%d)", name, from, to);
             uint32_t token = WildcardInvalid;
-            // chequea si es un campo extendido
-            if(pos == AddrField){
-                // chequea si es un wildcard
-                if(strncmp(&name[from], "+", to-from)==0){
-                	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (+) en delimitadores (%d,%d)", from, to);
-                    token = WildcardAny;
-                }            
-                else if(strncmp(&name[from], "#", to-from)==0){
-                	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (#) en delimitadores (%d,%d)", from, to);
-                    token = WildcardAll;
-                } 
-                // en caso contrario...
-                else{
-                    bool match = false;
-                    // comprueba si viene precedido del wildcard de direccionamiento
-                    if(strstr(name, WildcardScopeDev) != NULL || strstr(name, WildcardScopeGroup) != NULL){
-                    	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando token1. Detectado wildcardScope en token0");
-						match = true;
-					}
-                    // si es un campo numérico...
-                    if(match){
-                        // aplica el número
-                        char num[16];
-                        strncpy(num, &name[from], to-from);
-                        token = atoi(num);
-                        DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando token1. Detectado campo numérico [%d]", token);
-                    }
-                    // sino, busca el token
-                    else{
-                    	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando token1. No es un número, buscando token para delimitadores (%d,%d)", from, to);
-                        for(int i=0;i<(_token_provider_count - WildcardCOUNT);i++){
-                            // si encuentra el token... actualiza el id
-                            if(strncmp(_token_provider[i], &name[from], to-from)==0){
-                            	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando token1. Encontrado token [%s]", _token_provider[i]);
-                                token  = i + WildcardCOUNT;
-                                break;
-                            }
-                        }                          
-                    }
-                }                    
-                // actualiza el token id
-                id->tk[pos] = (MQ::token_t)(token >> (8*sizeof(MQ::token_t)));
-                id->tk[pos+1] = (MQ::token_t)token;
-                // salto al siguiente token
-                pos++;
-            } 
-            // si no es un campo extendido, busca el texto
-            else{
-            	// @05Mar2018.001 Verifico que sea un wildcard...
-            	// chequea si es un wildcard
-				if(strncmp(&name[from], "+", to-from)==0){
-					DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (+) en delimitadores (%d,%d)", from, to);
-					token = WildcardAny;
-				}
-				else if(strncmp(&name[from], "#", to-from)==0){
-					DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (#) en delimitadores (%d,%d)", from, to);
-					token = WildcardAll;
-				}
-				else{
-					DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando tokenX. Buscando token para delimitadores (%d,%d)", from, to);
-					for(int i=0;i<(_token_provider_count - WildcardCOUNT);i++){
-						// si encuentra el token... actualiza el id
-						if(strncmp(_token_provider[i], &name[from], to-from)==0){
-							DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando tokenX. Encontrado token [%s]", _token_provider[i]);
-							token  = i + WildcardCOUNT;
-							break;
-						}
+			// @05Mar2018.001 Verifico que sea un wildcard...
+			// chequea si es un wildcard
+			if(strncmp(&name[from], "+", to-from)==0){
+				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (+) en delimitadores (%d,%d)", from, to);
+				token = WildcardAny;
+			}
+			else if(strncmp(&name[from], "#", to-from)==0){
+				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (#) en delimitadores (%d,%d)", from, to);
+				token = WildcardAll;
+			}
+			else{
+				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando tokenX. Buscando token para delimitadores (%d,%d)", from, to);
+				for(int i=0;i<(_token_provider_count - WildcardCOUNT);i++){
+					// si encuentra el token... actualiza el id
+					if(strncmp(_token_provider[i], &name[from], to-from)==0){
+						DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando tokenX. Encontrado token [%s]", _token_provider[i]);
+						token  = i + WildcardCOUNT;
+						break;
 					}
 				}
-                id->tk[pos] = (MQ::token_t)(token);
-            }
+			}
+			id->tk[pos] = (MQ::token_t)(token);
+
             // pasa al siguiente campo
             from = to+1;
             getNextDelimiter(name, &from, &to, &is_final);            
@@ -839,49 +740,24 @@ private:
      */
     static bool matchIds(MQ::topic_t* found_id, MQ::topic_t* search_id){
         for(int i=0;i<MQ::MAX_TOKEN_LEVEL;i++){
-        	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Comparando token_%d", i);
-            if(i == AddrField){
-                uint32_t search_idex = (((uint32_t)search_id->tk[i]) << (8 * sizeof(MQ::token_t))) + search_id->tk[i+1];       
-                uint32_t found_idex = (((uint32_t)found_id->tk[i]) << (8 * sizeof(MQ::token_t))) + found_id->tk[i+1];
-                DEBUG_TRACE_D(_defdbg,"[MQLib].........", "El token_%d es un campo de dirección, comparando %d vs %d", i, found_idex, search_idex);
-                // si ha encontrado un wildcard All, es que coincide
-                if(found_idex == WildcardAll){
-                    return true;
-                }
-                
-                // si ha llegado al final de la cadena de búsqueda sin errores, es que coincide...
-                if(search_idex == WildcardNotUsed){
-                	if(found_idex != WildcardNotUsed)
-                		return false;
-                    return true;
-                }
+        	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Comparando %d vs %d", found_id->tk[i], search_id->tk[i]);
+			// si ha encontrado un wildcard All, es que coincide
+			if(found_id->tk[i] == WildcardAll){
+				return true;
+			}
 
-                // si no coinciden ni hay wildcards '+' involucrados, no hay coincidencia
-                if(found_idex != WildcardAny && found_idex != search_idex){
-                    return false;
-                }
-                // descarta el 2º subcampo
-                i++;
-            }
-            else{
-            	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "El token_%d es un campo normal, comparando %d vs %d", i, found_id->tk[i], search_id->tk[i]);
-                // si ha encontrado un wildcard All, es que coincide
-                if(found_id->tk[i] == WildcardAll){
-                    return true;
-                }
-                
-                // si ha llegado al final de la cadena de búsqueda sin errores, es que coincide...
-                if(search_id->tk[i] == WildcardNotUsed){
-                	if(found_id->tk[i] != WildcardNotUsed)
-                		return false;
-                    return true;
-                }
+			// si ha llegado al final de la cadena de búsqueda sin errores, es que coincide...
+			if(search_id->tk[i] == WildcardNotUsed){
+				if(found_id->tk[i] != WildcardNotUsed)
+					return false;
+				return true;
+			}
 
-                // si no coinciden ni hay wildcards '+' involucrados, no hay coincidencia
-                if(found_id->tk[i] != WildcardAny && found_id->tk[i] != search_id->tk[i]){
-                    return false;
-                }
-            }
+			// si no coinciden ni hay wildcards '+' involucrados, no hay coincidencia
+			if(found_id->tk[i] != WildcardAny && found_id->tk[i] != search_id->tk[i]){
+				return false;
+			}
+
             // en otro caso, es que coinciden y por lo tanto sigue analizando siguientes elementos
         }        
         // si llega a este punto es que coinciden todos los niveles
