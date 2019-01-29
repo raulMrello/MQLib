@@ -11,6 +11,7 @@
 
 #include "unity.h"
 #include "MQLib.h"
+#include <esp_task_wdt.h>
 
 //------------------------------------------------------------------------------------
 //-- REQUIRED HEADERS & COMPONENTS FOR TESTING ---------------------------------------
@@ -25,6 +26,7 @@ static void publishedCb(const char* topic, int32_t result);
 static void executePrerequisites();
 static const char* s_msg = "Hello";
 static bool s_subscription_updated = false;
+static uint32_t s_subscription_count = 0;
 
 //------------------------------------------------------------------------------------
 //-- SPECIFIC COMPONENTS FOR TESTING -------------------------------------------------
@@ -47,6 +49,8 @@ TEST_CASE("MQLib creation .......................", "[MQLib]") {
 	// Execute test pre-requisites
 	executePrerequisites();
 }
+
+
 //---------------------------------------------------------------------------
 /**
  * @brief Check simple topics matching:
@@ -74,7 +78,7 @@ TEST_CASE("Check simple topics matching .........", "[MQLib]") {
 	// print registered tokens
 	const char** tklist;
 	uint32_t tkcount;
-	MQ::MQBroker::getInternalTokenList(tklist, tkcount);
+	MQ::MQClient::getInternalTokenList(tklist, tkcount);
 	DEBUG_TRACE_D(_EXPR_, _MODULE_, "Registered tokens (should be 10): %d", tkcount);
 	TEST_ASSERT_EQUAL(tkcount, 10);
 
@@ -108,105 +112,171 @@ TEST_CASE("Check simple topics matching .........", "[MQLib]") {
 	TEST_ASSERT_TRUE(s_subscription_updated);
 }
 
-//---------------------------------------------------------------------------
-/**
- * @brief Check if topic stat/+/+/+ accepts updates on stat/all/vars/done
- * MQLib
- */
-TEST_CASE("Check length acceptance...............", "[MQLib]") {
 
-	// Execute test pre-requisites
-	executePrerequisites();
-
-	// clear result flag
-	s_subscription_updated = false;
-
-	// publish
-	MQ::ErrorResult res = MQ::MQClient::publish("stat/all/vars/done", s_msg, strlen(s_msg)+1, &s_published_cb);
-	TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
-
-	// check result: subscription not handled
-	TEST_ASSERT_TRUE(s_subscription_updated);
-}
 
 //---------------------------------------------------------------------------
 /**
- * @brief Check unknown tokens
- * MQLib
+ * @brief Check simple topics rejections with previous subscriptions:
+ * stat/var/1
+ * cmd/val/par/2
+ * set/param/at/var/5
  */
-TEST_CASE("Check unknown tokens..................", "[MQLib]") {
+TEST_CASE("Check simple topics rejections .......", "[MQLib]") {
 
 	// Execute test pre-requisites
 	executePrerequisites();
-	// set subscription: stat/+/+/+
-	DEBUG_TRACE_I(_EXPR_, _MODULE_, "Suscription to stat/+/+/+/+");
-	MQ::ErrorResult res = MQ::MQClient::subscribe("stat/+/+/+/+", new MQ::SubscribeCallback(&subscriptionCb));
-	TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	MQ::ErrorResult res;
+	if(!MQ::MQClient::existsTopic("stat/var/0")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to stat/var/0");
+		res = MQ::MQClient::subscribe("stat/var/0", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
 
+	if(!MQ::MQClient::existsTopic("cmd/cfg/par/2")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to cmd/cfg/par/2");
+		res = MQ::MQClient::subscribe("cmd/cfg/par/2", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
+
+	if(!MQ::MQClient::existsTopic("set/value/at/var/2")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to set/value/at/var/2");
+		res = MQ::MQClient::subscribe("set/value/at/var/2", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
 
 	// clear result flag
 	s_subscription_updated = false;
-
 	// publish
-	res = MQ::MQClient::publish("stat/g1/XEPPL00000000/value/light", s_msg, strlen(s_msg)+1, &s_published_cb);
+	res = MQ::MQClient::publish("stat/var/1", s_msg, strlen(s_msg)+1, &s_published_cb);
 	TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
-
 	// check result: subscription not handled
-	TEST_ASSERT_TRUE(s_subscription_updated);
+	TEST_ASSERT_FALSE(s_subscription_updated);
+
+	// clear result flag
+	s_subscription_updated = false;
+	// publish
+	res = MQ::MQClient::publish("cmd/val/par/2", s_msg, strlen(s_msg)+1, &s_published_cb);
+	TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	// check result: subscription not handled
+	TEST_ASSERT_FALSE(s_subscription_updated);
+
+	// clear result flag
+	s_subscription_updated = false;
+	// publish
+	res = MQ::MQClient::publish("set/param/at/var/5", s_msg, strlen(s_msg)+1, &s_published_cb);
+	TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	// check result: subscription not handled
+	TEST_ASSERT_FALSE(s_subscription_updated);
 }
+
+
+
+//---------------------------------------------------------------------------
+/**
+ * @brief Check wildcards
+ * stat/var/par/+
+ * stat/var/+/+
+ * stat/+/par/+
+ * stat/+/+/+
+ * stat/var/#
+ * stat/+/#
+ * stat/#
+ * #
+ */
+TEST_CASE("Check simple topics rejections .......", "[MQLib]") {
+
+	// Execute test pre-requisites
+	executePrerequisites();
+	MQ::ErrorResult res;
+
+	if(!MQ::MQClient::existsTopic("stat/var/par/+")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to stat/var/par/+");
+		res = MQ::MQClient::subscribe("stat/var/par/+", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
+
+	if(!MQ::MQClient::existsTopic("stat/var/+/+")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to stat/var/+/+");
+		res = MQ::MQClient::subscribe("stat/var/+/+", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
+
+	if(!MQ::MQClient::existsTopic("stat/+/par/+")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to stat/+/par/+");
+		res = MQ::MQClient::subscribe("stat/+/par/+", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
+
+	if(!MQ::MQClient::existsTopic("stat/+/+/+")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to stat/+/+/+");
+		res = MQ::MQClient::subscribe("stat/+/+/+", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
+
+	if(!MQ::MQClient::existsTopic("stat/var/#")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to stat/var/#");
+		res = MQ::MQClient::subscribe("stat/var/#", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
+
+	// watchdog reset for avoiding CPU starvation
+	esp_task_wdt_reset();
+
+	if(!MQ::MQClient::existsTopic("stat/+/#")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to stat/+/#");
+		res = MQ::MQClient::subscribe("stat/+/#", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
+
+	if(!MQ::MQClient::existsTopic("stat/#")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to stat/#");
+		res = MQ::MQClient::subscribe("stat/#", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
+
+	if(!MQ::MQClient::existsTopic("#")){
+		DEBUG_TRACE_D(_EXPR_, _MODULE_, "Suscription to #");
+		res = MQ::MQClient::subscribe("#", new MQ::SubscribeCallback(&subscriptionCb));
+		TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	}
+
+	// watchdog reset for avoiding CPU starvation
+	esp_task_wdt_reset();
+
+	// clear result flag
+	s_subscription_updated = false;
+	s_subscription_count = 0;
+	// publish
+	res = MQ::MQClient::publish("stat/var/1", s_msg, strlen(s_msg)+1, &s_published_cb);
+	TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	TEST_ASSERT_TRUE(s_subscription_updated);
+	TEST_ASSERT_EQUAL(s_subscription_count, 4);
+
+	// clear result flag
+	s_subscription_updated = false;
+	s_subscription_count = 0;
+	// publish
+	res = MQ::MQClient::publish("cmd/val/par/2", s_msg, strlen(s_msg)+1, &s_published_cb);
+	TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	TEST_ASSERT_TRUE(s_subscription_updated);
+	TEST_ASSERT_EQUAL(s_subscription_count, 1);
+
+	// clear result flag
+	s_subscription_updated = false;
+	s_subscription_count = 0;
+	// publish
+	res = MQ::MQClient::publish("stat/value/data/3", s_msg, strlen(s_msg)+1, &s_published_cb);
+	TEST_ASSERT_EQUAL(res, MQ::SUCCESS);
+	TEST_ASSERT_TRUE(s_subscription_updated);
+	TEST_ASSERT_EQUAL(s_subscription_count, 4);
+
+}
+
 
 
 //------------------------------------------------------------------------------------
 //-- PREREQUISITES -------------------------------------------------------------------
 //------------------------------------------------------------------------------------
-
-/** Tokens MQLib requeridos para este test */
-static MQ::Token token_list[] = {
-	P2P_PRODUCT_FAMILY,
-	P2P_PRODUCT_TYPE,
-	P2P_PRODUCT_SERIAL,
-    "ack",
-	"astcal",
-	"boot",
-	"calib",
-	"cfg",
-    "cmd",
-	"conn",
-    "dev",
-    "dir",
-	"endis",
-	"energy",
-    "event",
-	"evt",
-	"fwupd",
-	"get",
-    "group",
-	"hmi",
-	"led",
-	"light",
-	"minmax",
-	"modbus",
-	"mqtt",
-	"name",
-    "netm",
-	"ntp",
-	"ping",
-    "pushbutton",
-	"relay",
-    "req",
-	"result",
-    "rpc",
-	"set",
-	"start",
-    "stat",
-	"stop",
-    "sync",
-	"sys",
-    "value",
-	"wifi",
-    "zerocross",
-	"0",
-};
 
 
 /** Prerequisites execution control flag */
@@ -221,6 +291,7 @@ static void publishedCb(const char* topic, int32_t result){
 static void subscriptionCb(const char* topic, void* msg, uint16_t msg_len){
 	DEBUG_TRACE_I(_EXPR_, _MODULE_, "Recibido topic %s con mensaje de %d bytes", topic, msg_len);
 	s_subscription_updated = true;
+	s_subscription_count++;
 }
 
 //------------------------------------------------------------------------------------

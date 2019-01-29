@@ -504,15 +504,32 @@ _subscribe_exit:
     }
 
 
-    /** @fn getInternalTokenList
+    /** @fn getInternalTokenListReq
      *  @brief Obtiene la lista de tokens interna
      *  @param tklist Lista de tokens
      *  @param tkcount Número de tokens en la lista
      */
-    static void getInternalTokenList(const char** &tklist, uint32_t &tkcount){
+    static void getInternalTokenListReq(const char** &tklist, uint32_t &tkcount){
         tklist = _token_provider;
         tkcount = _token_provider_count - WildcardCOUNT;
     }
+
+
+    /** @fn existsTopicReq
+     *  @brief Chequea si un topic existe
+     *  @param name Nombre del topic a chequear
+     */
+    static bool existsTopicReq(const char* name){
+    	MQ::Topic* topic = _topic_list->getFirstItem();
+    	while(topic){
+    		if(strcmp(name, topic->name) == 0){
+    			return true;
+    		}
+    		topic = _topic_list->getNextItem();
+    	}
+    	return false;
+    }
+
 
 private:
 	
@@ -935,6 +952,26 @@ public:
     static inline bool isTopicToken(const char* topic, const char* token){
         return ((strcmp(topic + strlen(topic) - strlen(token), token) == 0)? true : false);
     }
+
+
+    /** @fn getInternalTokenListReq
+     *  @brief Obtiene la lista de tokens interna
+     *  @param tklist Lista de tokens
+     *  @param tkcount Número de tokens en la lista
+     */
+    static void getInternalTokenList(const char** &tklist, uint32_t &tkcount){
+    	MQBroker::getInternalTokenListReq(tklist, tkcount);
+    }
+
+
+    /** @fn existsTopicReq
+     *  @brief Chequea si un topic existe
+     *  @param name Nombre del topic a chequear
+     */
+    static bool existsTopic(const char* name){
+    	return MQBroker::existsTopicReq(name);
+    }
+
 };
 
 
