@@ -26,7 +26,7 @@ public:
             while(i==0){
             }
         }
-        DEBUG_TRACE_W(true, "[Heap]..........:", "HEAP_8=%d, HEAP_32=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_free_size(MALLOC_CAP_32BIT));
+        DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, HEAP_32=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_free_size(MALLOC_CAP_32BIT));
         return ptr;
     }
     static void memFree(void* ptr){
