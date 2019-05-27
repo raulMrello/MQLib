@@ -19,14 +19,14 @@
 
 class Heap{
 public:
-	static void* memAlloc(size_t size){
+	static void* memAlloc(size_t size, bool dbg_trace = false){
         void *ptr = malloc(size);
         if(!ptr){
             volatile int i = 0;
             while(i==0){
             }
         }
-        DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, HEAP_32=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_free_size(MALLOC_CAP_32BIT));
+        DEBUG_TRACE_W((!IS_ISR() && dbg_trace), "[Heap]..........:", "HEAP_8=%d, HEAP_32=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_free_size(MALLOC_CAP_32BIT));
         return ptr;
     }
     static void memFree(void* ptr){
