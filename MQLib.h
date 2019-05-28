@@ -251,8 +251,8 @@ __start_exit:
 
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
-			if(_mutex.lock(DefaultMutexTimeout) == osErrorTimeoutResource){
-				return addPendingRequest(ReqSubscribe, name, NULL, 0, NULL, subscriber);
+			if(_mutex.lock(1000) == osErrorTimeoutResource){
+				MBED_ASSERT(false); //return addPendingRequest(ReqSubscribe, name, NULL, 0, NULL, subscriber);
 			}
         }
 
@@ -312,7 +312,7 @@ __start_exit:
 _subscribe_exit:
 		if(use_lock){
 			_mutex.unlock();
-			processPendingRequests();
+//			processPendingRequests();
 		}
         return err;
     }
@@ -338,8 +338,8 @@ _subscribe_exit:
 
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
-			if(_mutex.lock(DefaultMutexTimeout) == osErrorTimeoutResource){
-				return addPendingRequest(ReqUnsubscribe, name, NULL, 0, NULL, subscriber);
+			if(_mutex.lock(1000) == osErrorTimeoutResource){
+				MBED_ASSERT(false); //return addPendingRequest(ReqUnsubscribe, name, NULL, 0, NULL, subscriber);
 			}
         }
 
@@ -362,7 +362,7 @@ _subscribe_exit:
 
 		if(use_lock){
 			_mutex.unlock();
-			processPendingRequests();
+//			processPendingRequests();
 		}
 		return err;
     }
@@ -390,8 +390,8 @@ _subscribe_exit:
 
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
-			if(_mutex.lock(DefaultMutexTimeout) == osErrorTimeoutResource){
-				return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
+			if(_mutex.lock(1000) == osErrorTimeoutResource){
+				MBED_ASSERT(false); //return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
 			}
         }
 
@@ -400,7 +400,7 @@ _subscribe_exit:
             if(!generateTokens(name)){
                 if(use_lock){
         			_mutex.unlock();
-        			processPendingRequests();
+//        			processPendingRequests();
         		}
         		return OUT_OF_MEMORY;
             }
@@ -441,7 +441,7 @@ _subscribe_exit:
 
         if(use_lock){
 			_mutex.unlock();
-			processPendingRequests();
+//			processPendingRequests();
 		}
 		return SUCCESS;
     }
