@@ -128,6 +128,7 @@ enum ErrorResult{
 	EXISTS,           		///< Fallo por objeto existente
 	NOT_FOUND,        		///< Fallo por objeto no existente
     OUT_OF_BOUNDS,          ///< Fallo por exceso de tamaño
+    LOCK_TIMEOUT,			///< Fallo por timeout en el lock
 };
 	
     
@@ -252,7 +253,9 @@ __start_exit:
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
 			if(_mutex.lock(1000) == osErrorTimeoutResource){
-				MBED_ASSERT(false); //return addPendingRequest(ReqSubscribe, name, NULL, 0, NULL, subscriber);
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_SUBSC_TIMEOUT en topic %s", name);
+				return LOCK_TIMEOUT;
+				//return addPendingRequest(ReqSubscribe, name, NULL, 0, NULL, subscriber);
 			}
         }
 
@@ -339,7 +342,9 @@ _subscribe_exit:
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
 			if(_mutex.lock(1000) == osErrorTimeoutResource){
-				MBED_ASSERT(false); //return addPendingRequest(ReqUnsubscribe, name, NULL, 0, NULL, subscriber);
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_UNSUBSC_TIMEOUT en topic %s", name);
+				return LOCK_TIMEOUT;
+				//return addPendingRequest(ReqUnsubscribe, name, NULL, 0, NULL, subscriber);
 			}
         }
 
@@ -391,7 +396,9 @@ _subscribe_exit:
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
 			if(_mutex.lock(1000) == osErrorTimeoutResource){
-				MBED_ASSERT(false); //return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUB_TIMEOUT en topic %s", name);
+				return LOCK_TIMEOUT;
+				//return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
 			}
         }
 
