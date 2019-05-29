@@ -92,7 +92,7 @@ static const uint8_t DefaultMaxTopicNameLength = 64;
 /** @struct MQ::MAX_TOKEN_LEVEL
  *  @brief Tipo definido para definir la profundidad máxima de los topics
  */
-static const uint8_t MAX_TOKEN_LEVEL = 8;
+static const uint8_t MAX_TOKEN_LEVEL = 10;
    
     
 /** @struct MQ::token_t
