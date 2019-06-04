@@ -18,9 +18,24 @@
 #include <stdlib.h>
 
 
+
 class Heap{
 public:
-	static void* memAlloc(size_t size, bool dbg_trace = false){
+	/** Set debug level
+	 *
+	 * @param log_level debug level
+	 */
+	static void setDebugLevel(int log_level){
+		esp_log_level_set("[Heap]..........:", log_level);
+	}
+
+	/** Allocates memory
+	 *
+	 * @param size Size in bytes to allocate
+	 * @param dbg_trace
+	 * @return pointer to the allocated memory or NULL
+	 */
+	static void* memAlloc(size_t size){
 		_mtx.lock();
         void *ptr = malloc(size);
         if(!ptr){
@@ -29,16 +44,21 @@ public:
             }
         }
         _mtx.unlock();
-        DEBUG_TRACE_W((!IS_ISR() && dbg_trace), "[Heap]..........:", "HEAP_8=%d, Alloc=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
+        DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Alloc=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
         return ptr;
     }
-    static void memFree(void* ptr, bool dbg_trace = false){
+
+	/** Releases allocated memory
+	 *
+	 * @param ptr Pointer to release
+	 */
+    static void memFree(void* ptr){
     	_mtx.lock();
     	uint32_t size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
         free(ptr);
         size = heap_caps_get_free_size(MALLOC_CAP_8BIT) - size;
         _mtx.unlock();
-        DEBUG_TRACE_W((!IS_ISR() && dbg_trace), "[Heap]..........:", "HEAP_8=%d, Free=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
+        DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Free=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
     }
 private:
     static Mutex _mtx;
