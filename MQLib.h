@@ -77,6 +77,7 @@
 #include "List.h"
 #include "Heap.h"
 
+
 //------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------
@@ -136,6 +137,12 @@ enum ErrorResult{
  *  @brief Tipo definido para definir el identificador de un topic
  */
 #if __MBED__ == 1
+#define DEBUG_TRACE_E(expr, tag, format, ...)			
+#define DEBUG_TRACE_W(expr, tag, format, ...)			
+#define DEBUG_TRACE_I(expr, tag, format, ...)			
+#define DEBUG_TRACE_D(expr, tag, format, ...)			
+#define DEBUG_TRACE_V(expr, tag, format, ...)			
+
 __packed struct topic_t{
     uint8_t tk[MQ::MAX_TOKEN_LEVEL+1];
 };

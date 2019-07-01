@@ -17,7 +17,14 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-
+#if __MBED__ == 1
+using namespace rtos;
+#define DEBUG_TRACE_E(expr, tag, format, ...)			
+#define DEBUG_TRACE_W(expr, tag, format, ...)			
+#define DEBUG_TRACE_I(expr, tag, format, ...)			
+#define DEBUG_TRACE_D(expr, tag, format, ...)			
+#define DEBUG_TRACE_V(expr, tag, format, ...)			
+#endif
 
 class Heap{
 public:
@@ -26,7 +33,9 @@ public:
 	 * @param log_level debug level
 	 */
 	static void setDebugLevel(int log_level){
+        #if ESP_PLATFORM == 1
 		esp_log_level_set("[Heap]..........:", log_level);
+        #endif
 	}
 
 	/** Allocates memory
@@ -44,7 +53,9 @@ public:
             }
         }
         _mtx.unlock();
+        #if ESP_PLATFORM == 1
         DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Alloc=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
+        #endif
         return ptr;
     }
 
@@ -54,11 +65,17 @@ public:
 	 */
     static void memFree(void* ptr){
     	_mtx.lock();
+        #if ESP_PLATFORM == 1
     	uint32_t size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+        #endif
         free(ptr);
+        #if ESP_PLATFORM == 1
         size = heap_caps_get_free_size(MALLOC_CAP_8BIT) - size;
+        #endif
         _mtx.unlock();
+        #if ESP_PLATFORM == 1
         DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Free=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
+        #endif
     }
 private:
     static Mutex _mtx;
