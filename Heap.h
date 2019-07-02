@@ -18,12 +18,8 @@
 #include <stdlib.h>
 
 #if __MBED__ == 1
+#include "mbed.h"
 using namespace rtos;
-#define DEBUG_TRACE_E(expr, tag, format, ...)			
-#define DEBUG_TRACE_W(expr, tag, format, ...)			
-#define DEBUG_TRACE_I(expr, tag, format, ...)			
-#define DEBUG_TRACE_D(expr, tag, format, ...)			
-#define DEBUG_TRACE_V(expr, tag, format, ...)			
 #endif
 
 class Heap{
@@ -32,10 +28,8 @@ public:
 	 *
 	 * @param log_level debug level
 	 */
-	static void setDebugLevel(int log_level){
-        #if ESP_PLATFORM == 1
-		esp_log_level_set("[Heap]..........:", log_level);
-        #endif
+	static void setDebugLevel(esp_log_level_t log_level){
+        esp_log_level_set("[Heap]..........:", log_level);        
 	}
 
 	/** Allocates memory
