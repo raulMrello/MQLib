@@ -20,6 +20,7 @@
 #if __MBED__ == 1
 #include "mbed.h"
 using namespace rtos;
+#include "mdf_api_cortex.h"
 #endif
 
 class Heap{
