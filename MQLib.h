@@ -136,16 +136,9 @@ enum ErrorResult{
 /** @struct MQ::topic_t
  *  @brief Tipo definido para definir el identificador de un topic
  */
-#if __MBED__ == 1
-__packed struct topic_t{
-    uint8_t tk[MQ::MAX_TOKEN_LEVEL+1];
-};
-
-#elif ESP_PLATFORM == 1
 struct __packed topic_t{
     uint8_t tk[MQ::MAX_TOKEN_LEVEL+1];
 };
-#endif
 
 
 
