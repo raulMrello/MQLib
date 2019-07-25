@@ -18,7 +18,7 @@
 #include <stdlib.h>
 
 #if __MBED__ == 1
-#include "mbed.h"
+#include "mbed_mem_trace.h"
 using namespace rtos;
 #include "mdf_api_cortex.h"
 #endif
@@ -40,16 +40,24 @@ public:
 	 * @return pointer to the allocated memory or NULL
 	 */
 	static void* memAlloc(size_t size){
-		_mtx.lock();
+		if(!IS_ISR()){
+			_mtx.lock();
+		}
         void *ptr = malloc(size);
         if(!ptr){
             volatile int i = 0;
             while(i==0){
             }
         }
-        _mtx.unlock();
+		if(!IS_ISR()){
+			_mtx.unlock();
+		}
         #if ESP_PLATFORM == 1
         DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Alloc=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
+		#elif __MBED__==1
+        mbed_stats_heap_t heap_stats;
+        mbed_stats_heap_get(&heap_stats);
+        DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Alloc=%d", (heap_stats.reserved_size - heap_stats.current_size), size);
         #endif
         return ptr;
     }
@@ -59,17 +67,30 @@ public:
 	 * @param ptr Pointer to release
 	 */
     static void memFree(void* ptr){
-    	_mtx.lock();
+		if(!IS_ISR()){
+			_mtx.lock();
+		}
         #if ESP_PLATFORM == 1
     	uint32_t size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+		#elif __MBED__==1
+    	mbed_stats_heap_t heap_stats;
+    	mbed_stats_heap_get(&heap_stats);
+    	uint32_t size = heap_stats.reserved_size - heap_stats.current_size;
         #endif
         free(ptr);
         #if ESP_PLATFORM == 1
         size = heap_caps_get_free_size(MALLOC_CAP_8BIT) - size;
+		#elif __MBED__==1
+        mbed_stats_heap_get(&heap_stats);
+        size = (heap_stats.reserved_size - heap_stats.current_size) - size;
         #endif
-        _mtx.unlock();
+		if(!IS_ISR()){
+			_mtx.unlock();
+		}
         #if ESP_PLATFORM == 1
         DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Free=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
+		#elif __MBED__==1
+        DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Free=%d", (heap_stats.reserved_size - heap_stats.current_size), size);
         #endif
     }
 private:
