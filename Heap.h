@@ -21,6 +21,8 @@
 #include "mbed_mem_trace.h"
 using namespace rtos;
 #include "mdf_api_cortex.h"
+#elif ESP_PLATFORM == 1
+#include "sdkconfig.h"
 #endif
 
 class Heap{
@@ -53,7 +55,11 @@ public:
 			_mtx.unlock();
 		}
         #if ESP_PLATFORM == 1
+		#if CONFIG_SPIRAM_SUPPORT==1
+		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Alloc=%d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM), size);
+		#else
         DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Alloc=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
+		#endif
 		#elif __MBED__==1
         mbed_stats_heap_t heap_stats;
         mbed_stats_heap_get(&heap_stats);
@@ -71,7 +77,12 @@ public:
 			_mtx.lock();
 		}
         #if ESP_PLATFORM == 1
+		#if CONFIG_SPIRAM_SUPPORT==1
+    	uint32_t size = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+		#else
     	uint32_t size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+		#endif
+
 		#elif __MBED__==1
     	mbed_stats_heap_t heap_stats;
     	mbed_stats_heap_get(&heap_stats);
@@ -79,7 +90,12 @@ public:
         #endif
         free(ptr);
         #if ESP_PLATFORM == 1
-        size = heap_caps_get_free_size(MALLOC_CAP_8BIT) - size;
+		#if CONFIG_SPIRAM_SUPPORT==1
+        size = heap_caps_get_free_size(MALLOC_CAP_SPIRAM) - size;
+		#else
+		size = heap_caps_get_free_size(MALLOC_CAP_8BIT) - size;
+		#endif
+
 		#elif __MBED__==1
         mbed_stats_heap_get(&heap_stats);
         size = (heap_stats.reserved_size - heap_stats.current_size) - size;
@@ -88,8 +104,13 @@ public:
 			_mtx.unlock();
 		}
         #if ESP_PLATFORM == 1
-        DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Free=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
-		#elif __MBED__==1
+
+		#if CONFIG_SPIRAM_SUPPORT==1
+		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Free=%d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM), size);
+		#else
+		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Free=%d", heap_caps_get_free_size(MALLOC_CAP_8BIT), size);
+		#endif
+        #elif __MBED__==1
         DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_8=%d, Free=%d", (heap_stats.reserved_size - heap_stats.current_size), size);
         #endif
     }
