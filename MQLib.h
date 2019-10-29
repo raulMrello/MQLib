@@ -176,6 +176,7 @@ public:
      */
     static int32_t start(uint8_t max_len_of_name, bool defdbg = false){
     	int32_t rc = SUCCESS;
+    	_pub_count = 0;
     	_mutex.lock();
         // ajusto parámetros por defecto 
     	_defdbg = defdbg;
@@ -385,16 +386,16 @@ _subscribe_exit:
             return OUT_OF_BOUNDS;
         }
 
-        DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Iniciando publicación en '%s' con '%d' datos", name, datasize);
-
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
-			if(_mutex.lock(1000) == osErrorTimeoutResource){
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUB_TIMEOUT en topic %s", name);
+			if(_mutex.lock(DefaultMutexTimeout) == osErrorTimeoutResource){
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUB_TIMEOUT [%d] en topic %s", _pub_count++, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
 			}
         }
+
+        DEBUG_TRACE_W(true, "[MQLib].........", "Publicacion [%d] en topic  '%s'", _pub_count++, name);
 
         // si la lista de tokens es automantenida, crea los ids de los tokens no existentes
         if(_tokenlist_internal){
@@ -531,9 +532,15 @@ _subscribe_exit:
     	return false;
     }
 
+    /** Máximo tiempo de espera en el mutex antes de crear solicitud pendiente */
+    static const uint32_t DefaultMutexTimeout = 1000;
+
 
 private:
 	
+    /** Contador de publicaciones */
+    static uint32_t _pub_count;
+
     /** Identificador de wildcards */
     enum Wildcards{
         WildcardNotUsed = 0,
@@ -551,9 +558,6 @@ private:
 		ReqSubscribe,   //!< ReqSubscribe Solicitud de suscripción
 		ReqUnsubscribe, //!< ReqUnsubscribe Solicitud de unsuscripción
     };
-
-    /** Máximo tiempo de espera en el mutex antes de crear solicitud pendiente */
-    static const uint32_t DefaultMutexTimeout = 100;
 
     /** Máximo número de tokens permitidos en topic provider auto-gestionado */
     static const uint16_t DefaultMaxNumTokenEntries = (256 - WildcardCOUNT);    
