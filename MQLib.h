@@ -395,7 +395,7 @@ _subscribe_exit:
 			}
         }
 
-        DEBUG_TRACE_W(true, "[MQLib].........", "Publicacion [%d] en topic  '%s'", _pub_count++, name);
+        DEBUG_TRACE_I(true, "[MQLib].........", "Publicacion [%d] en topic  '%s'", _pub_count++, name);
 
         // si la lista de tokens es automantenida, crea los ids de los tokens no existentes
         if(_tokenlist_internal){
