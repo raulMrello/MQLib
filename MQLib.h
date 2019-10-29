@@ -247,8 +247,9 @@ __start_exit:
 
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
-			if(_mutex.lock(1000) == osErrorTimeoutResource){
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_SUBSC_TIMEOUT en topic %s", name);
+        	osStatus oss;
+			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_SUBSCRIBE [%d] en topic %s", oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqSubscribe, name, NULL, 0, NULL, subscriber);
 			}
@@ -336,8 +337,9 @@ _subscribe_exit:
 
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
-			if(_mutex.lock(1000) == osErrorTimeoutResource){
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_UNSUBSC_TIMEOUT en topic %s", name);
+        	osStatus oss;
+			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_UNSUBSCRIBE [%d] en topic %s", oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqUnsubscribe, name, NULL, 0, NULL, subscriber);
 			}
@@ -388,8 +390,9 @@ _subscribe_exit:
 
         // Inicia la búsqueda del topic para ver si ya existe
         if(use_lock){
-			if(_mutex.lock(DefaultMutexTimeout) == osErrorTimeoutResource){
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUB_TIMEOUT [%d] en topic %s", _pub_count++, name);
+        	osStatus oss;
+			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%d] err=[%d] en topic %s", _pub_count++, oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
 			}
