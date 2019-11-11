@@ -27,6 +27,18 @@ using namespace rtos;
 
 class Heap{
 public:
+
+	static void printHeap(){
+		#if ESP_PLATFORM == 1
+		uint32_t size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+		#elif __MBED__==1
+		mbed_stats_heap_t heap_stats;
+		mbed_stats_heap_get(&heap_stats);
+		size_t size = (heap_stats.reserved_size - heap_stats.current_size);
+		#endif
+		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d", size);
+	}
+
 	/** Set debug level
 	 *
 	 * @param log_level debug level
@@ -67,7 +79,7 @@ public:
         mbed_stats_heap_get(&heap_stats);
         size_t post_size = (heap_stats.reserved_size - heap_stats.current_size);
         #endif
-        DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
+        DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
         return ptr;
     }
 
@@ -97,7 +109,7 @@ public:
 		if(!IS_ISR()){
 			_mtx.unlock();
 		}
-		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Free=%d", post_size, (post_size - prev_size));
+		DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Free=%d", post_size, (post_size - prev_size));
     }
 private:
     static Mutex _mtx;
