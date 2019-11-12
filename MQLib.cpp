@@ -9,7 +9,6 @@
 #include "MQLib.h"
 
 /** Mutex para MQBroker */
-
 Mutex MQ::MQBroker::_mutex;
 
 /** Lista de topics */
@@ -24,3 +23,6 @@ uint8_t MQ::MQBroker::_max_name_len = 0;
 
 bool MQ::MQBroker::_defdbg = false;
 List<MQ::MQBroker::PendingRequest_t> * MQ::MQBroker::_pending_list = 0;
+
+/** Contador de publicaciones */
+uint32_t MQ::MQBroker::_pub_count = 0;
