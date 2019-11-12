@@ -76,6 +76,8 @@
 #include "mbed.h"
 #include "List.h"
 #include "Heap.h"
+#include <list>
+#include <map>
 
 
 //------------------------------------------------------------------------------------
@@ -117,7 +119,12 @@ typedef Callback<void(const char* name, void*, uint16_t)> SubscribeCallback;
  *  @brief Tipo definido para las callbacs de publicación
  */
  typedef Callback<void(const char* name, int32_t)> PublishCallback;
-	
+
+ /** @type MQ::SubscribeCallback
+  *  @brief Tipo definido para las callbacs de suscripción
+  */
+ typedef Callback<void(const char* name, void*, uint16_t, PublishCallback*)> BridgeCallback;
+
 /** @enum ErrorResult
  *  @brief Resultados de error generados por la librería
  */
@@ -902,11 +909,29 @@ public:
      *  @param data Mensaje
      *  @param datasize Tamaño del mensaje
      *  @param publisher Callback de notificación de la publicación
+     *  @param is_bridge Flag que indica si la publicación proviene de un bridge
 	 *	@return Resultado
      */
-    static int32_t publish (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher){
-        return MQBroker::publishReq(name, data, datasize, publisher);
+    static int32_t publish (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher, bool is_bridge=false){
+        int32_t err = MQBroker::publishReq(name, data, datasize, publisher);
+        if(!is_bridge){
+        	executeBridge(name, data, datasize, publisher);
+        }
+        return err;
     }  
+
+
+    /** @fn republish
+     *  @brief Publica un bridge
+     *  @param name Nombre del topic
+     *  @param data Mensaje
+     *  @param datasize Tamaño del mensaje
+     *  @param publisher Callback de notificación de la publicación
+	 *	@return Resultado
+     */
+    static int32_t republish (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher){
+        return publish(name, data, datasize, publisher, true);
+    }
 
     
     /** @fn getTopicName 
@@ -979,6 +1004,76 @@ public:
     static bool existsTopic(const char* name){
     	return MQBroker::existsTopicReq(name);
     }
+
+    /**
+     * Añade un bridge a un topic dado
+     * @param topic Topic origen
+     * @param cb Callback para procesar el bridging
+     */
+    static int32_t addBridge(const char* topic, MQ::BridgeCallback* cb){
+    	std::map<std::string, std::list<MQ::BridgeCallback*>*>::iterator it = _bridges.find(topic);
+    	if(it!=_bridges.end()){
+    		for(auto i = it->second->begin(); i != it->second->end(); ++i){
+    			MQ::BridgeCallback* bc = (*i);
+    			if(cb == bc){
+    				return -2;
+    			}
+    		}
+    		it->second->push_back(cb);
+    		return 0;
+    	}
+    	// si no hay ningún elemento en el mapa, con ese topic, lo crea
+    	std::list<MQ::BridgeCallback*>* bclist = new std::list<MQ::BridgeCallback*>();
+    	MBED_ASSERT(bclist);
+    	bclist->push_back(cb);
+    	_bridges.insert(std::pair<std::string, std::list<MQ::BridgeCallback*>*>(topic, bclist));
+    	return 0;
+    }
+
+    /**
+     * Elimina un bridge de un topic dado
+     * @param topic Topic origen
+     * @param cb Callback a eliminar
+     */
+    static int32_t removeBridge(const char* topic, MQ::BridgeCallback* cb){
+    	std::map<std::string, std::list<MQ::BridgeCallback*>*>::iterator it = _bridges.find(topic);
+    	if(it!=_bridges.end()){
+    		for(auto i = it->second->begin(); i != it->second->end(); ++i){
+    			MQ::BridgeCallback* bc = (*i);
+    			if(cb == bc){
+    				it->second->remove(bc);
+    				// si se han eliminado todos los elementos, se elimina del mapa
+    				if(it->second->size() == 0){
+    					delete(it->second);
+    					_bridges.erase(it);
+    				}
+    				return 0;
+    			}
+    		}
+    	}
+    	return -1;
+    }
+
+    /**
+     * Ejecuta un bridge dado si existe
+     *  @param name Nombre del topic
+     *  @param data Mensaje
+     *  @param datasize Tamaño del mensaje
+     *  @param publisher Callback de notificación de la publicación
+     */
+    static void executeBridge(const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher){
+    	std::map<std::string, std::list<MQ::BridgeCallback*>*>::iterator it = _bridges.find(name);
+    	if(it!=_bridges.end()){
+    		for(auto i = it->second->begin(); i != it->second->end(); ++i){
+    			MQ::BridgeCallback* bc = (*i);
+    			bc->call(name, data, datasize, publisher);
+    		}
+    	}
+    }
+
+
+private:
+    static std::map<std::string, std::list<MQ::BridgeCallback*>*> _bridges;
 
 };
 
