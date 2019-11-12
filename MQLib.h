@@ -912,11 +912,9 @@ public:
      *  @param is_bridge Flag que indica si la publicación proviene de un bridge
 	 *	@return Resultado
      */
-    static int32_t publish (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher, bool is_bridge=false){
+    static int32_t publish (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher){
         int32_t err = MQBroker::publishReq(name, data, datasize, publisher);
-        if(!is_bridge){
-        	executeBridge(name, data, datasize, publisher);
-        }
+        executeBridge(name, data, datasize, publisher);
         return err;
     }  
 
@@ -930,7 +928,7 @@ public:
 	 *	@return Resultado
      */
     static int32_t republish (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher){
-        return publish(name, data, datasize, publisher, true);
+        return MQBroker::publishReq(name, data, datasize, publisher);
     }
 
     
