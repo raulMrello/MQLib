@@ -29,12 +29,13 @@ class Heap{
 public:
 
 	static void printHeap(){
+		uint32_t size=0;
 		#if ESP_PLATFORM == 1
-		uint32_t size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+		size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
 		#elif __MBED__==1
 		mbed_stats_heap_t heap_stats;
 		mbed_stats_heap_get(&heap_stats);
-		size_t size = (heap_stats.reserved_size - heap_stats.current_size);
+		size = (heap_stats.reserved_size - heap_stats.current_size);
 		#endif
 		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d", size);
 	}
@@ -57,12 +58,14 @@ public:
 		if(!IS_ISR()){
 			_mtx.lock();
 		}
+		uint32_t prev_size=0;
+		uint32_t post_size=0;
 		#if ESP_PLATFORM == 1
-		uint32_t prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+		prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
 		#elif __MBED__==1
         mbed_stats_heap_t heap_stats;
         mbed_stats_heap_get(&heap_stats);
-		size_t prev_size = (heap_stats.reserved_size - heap_stats.current_size);
+		prev_size = (heap_stats.reserved_size - heap_stats.current_size);
 		#endif
         void *ptr = malloc(size);
         if(!ptr){
@@ -74,10 +77,10 @@ public:
 			_mtx.unlock();
 		}
         #if ESP_PLATFORM == 1
-		uint32_t post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+		post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
 		#elif __MBED__==1
         mbed_stats_heap_get(&heap_stats);
-        size_t post_size = (heap_stats.reserved_size - heap_stats.current_size);
+        post_size = (heap_stats.reserved_size - heap_stats.current_size);
         #endif
         DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
         return ptr;
@@ -91,20 +94,22 @@ public:
 		if(!IS_ISR()){
 			_mtx.lock();
 		}
+		uint32_t prev_size=0;
+		uint32_t post_size=0;
         #if ESP_PLATFORM == 1
-    	uint32_t prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    	prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
 
 		#elif __MBED__==1
     	mbed_stats_heap_t heap_stats;
     	mbed_stats_heap_get(&heap_stats);
-    	uint32_t prev_size = heap_stats.reserved_size - heap_stats.current_size;
+    	prev_size = heap_stats.reserved_size - heap_stats.current_size;
         #endif
         free(ptr);
         #if ESP_PLATFORM == 1
-		uint32_t post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+		post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
 		#elif __MBED__==1
         mbed_stats_heap_get(&heap_stats);
-        uint32_t post_size = (heap_stats.reserved_size - heap_stats.current_size);
+        post_size = (heap_stats.reserved_size - heap_stats.current_size);
         #endif
 		if(!IS_ISR()){
 			_mtx.unlock();

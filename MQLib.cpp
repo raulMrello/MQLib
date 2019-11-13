@@ -26,3 +26,6 @@ List<MQ::MQBroker::PendingRequest_t> * MQ::MQBroker::_pending_list = 0;
 
 /** Contador de publicaciones */
 uint32_t MQ::MQBroker::_pub_count = 0;
+
+/** Gestor de bridges */
+std::map<std::string, std::list<MQ::BridgeCallback*>*> MQ::MQClient::_bridges;
