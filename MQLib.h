@@ -186,7 +186,8 @@ public:
     	_pub_count = 0;
     	_mutex.lock();
         // ajusto parámetros por defecto 
-    	_defdbg = defdbg;
+    	setLoggingLevel((defdbg)? ESP_LOG_DEBUG : ESP_LOG_INFO);
+    	_defdbg = true;
         _max_name_len = max_len_of_name-1;
         DEBUG_TRACE_I(_defdbg,"[MQLib].........", "Iniciando Broker...");
 		_tokenlist_internal = true;
@@ -221,6 +222,10 @@ public:
 __start_exit:
 	_mutex.unlock();
 	return rc;
+    }
+
+    static void setLoggingLevel(esp_log_level_t level){
+    	esp_log_level_set("[MQLib].........", level);
     }
 
 
@@ -405,7 +410,7 @@ _subscribe_exit:
 			}
         }
 
-        DEBUG_TRACE_I(true, "[MQLib].........", "Publicacion [%d] en topic  '%s'", _pub_count++, name);
+        DEBUG_TRACE_D(true, "[MQLib].........", "Publicacion [%d] en topic  '%s'", _pub_count++, name);
 
         // si la lista de tokens es automantenida, crea los ids de los tokens no existentes
         if(_tokenlist_internal){
