@@ -82,7 +82,7 @@ public:
         mbed_stats_heap_get(&heap_stats);
         post_size = (heap_stats.reserved_size - heap_stats.current_size);
         #endif
-        DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
+        DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
         return ptr;
     }
 
@@ -114,7 +114,7 @@ public:
 		if(!IS_ISR()){
 			_mtx.unlock();
 		}
-		DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Free=%d", post_size, (post_size - prev_size));
+		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Free=%d", post_size, (post_size - prev_size));
     }
 private:
     static Mutex _mtx;
