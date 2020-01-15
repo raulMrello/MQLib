@@ -55,18 +55,20 @@ public:
 	 * @return pointer to the allocated memory or NULL
 	 */
 	static void* memAlloc(size_t size){
-		if(!IS_ISR()){
-			_mtx.lock();
-		}
 		uint32_t prev_size=0;
 		uint32_t post_size=0;
-		#if ESP_PLATFORM == 1
-		prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-		#elif __MBED__==1
-        mbed_stats_heap_t heap_stats;
-        mbed_stats_heap_get(&heap_stats);
-		prev_size = (heap_stats.reserved_size - heap_stats.current_size);
+		#if __MBED__==1
+		mbed_stats_heap_t heap_stats;
 		#endif
+		if(!IS_ISR()){
+			_mtx.lock();
+			#if ESP_PLATFORM == 1
+			prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+			#elif __MBED__==1
+			mbed_stats_heap_get(&heap_stats);
+			prev_size = (heap_stats.reserved_size - heap_stats.current_size);
+			#endif
+		}
         void *ptr = malloc(size);
         if(!ptr){
             volatile int i = 0;
@@ -75,14 +77,14 @@ public:
         }
 		if(!IS_ISR()){
 			_mtx.unlock();
+			#if ESP_PLATFORM == 1
+			post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+			#elif __MBED__==1
+			mbed_stats_heap_get(&heap_stats);
+			post_size = (heap_stats.reserved_size - heap_stats.current_size);
+			#endif
+			DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
 		}
-        #if ESP_PLATFORM == 1
-		post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-		#elif __MBED__==1
-        mbed_stats_heap_get(&heap_stats);
-        post_size = (heap_stats.reserved_size - heap_stats.current_size);
-        #endif
-        DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
         return ptr;
     }
 
@@ -91,27 +93,29 @@ public:
 	 * @param ptr Pointer to release
 	 */
     static void memFree(void* ptr){
-		if(!IS_ISR()){
-			_mtx.lock();
-		}
 		uint32_t prev_size=0;
 		uint32_t post_size=0;
-        #if ESP_PLATFORM == 1
-    	prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-
-		#elif __MBED__==1
-    	mbed_stats_heap_t heap_stats;
-    	mbed_stats_heap_get(&heap_stats);
-    	prev_size = heap_stats.reserved_size - heap_stats.current_size;
-        #endif
-        free(ptr);
-        #if ESP_PLATFORM == 1
-		post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-		#elif __MBED__==1
-        mbed_stats_heap_get(&heap_stats);
-        post_size = (heap_stats.reserved_size - heap_stats.current_size);
-        #endif
+		#if __MBED__==1
+		mbed_stats_heap_t heap_stats;
+		#endif
 		if(!IS_ISR()){
+			_mtx.lock();
+			#if ESP_PLATFORM == 1
+			prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+
+			#elif __MBED__==1
+			mbed_stats_heap_get(&heap_stats);
+			prev_size = heap_stats.reserved_size - heap_stats.current_size;
+			#endif
+		}
+        free(ptr);
+		if(!IS_ISR()){
+			#if ESP_PLATFORM == 1
+			post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+			#elif __MBED__==1
+			mbed_stats_heap_get(&heap_stats);
+			post_size = (heap_stats.reserved_size - heap_stats.current_size);
+			#endif
 			_mtx.unlock();
 		}
 		DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Free=%d", post_size, (post_size - prev_size));
