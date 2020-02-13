@@ -37,7 +37,7 @@ public:
 		mbed_stats_heap_get(&heap_stats);
 		size = (heap_stats.reserved_size - heap_stats.current_size);
 		#endif
-		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d. %s", size, added_text);
+		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........", "HEAP_free=%d. %s", size, added_text);
 	}
 
 	/** Set debug level
@@ -45,7 +45,7 @@ public:
 	 * @param log_level debug level
 	 */
 	static void setDebugLevel(esp_log_level_t log_level){
-        esp_log_level_set("[Heap]..........:", log_level);        
+        esp_log_level_set("[Heap]..........", log_level);
 	}
 
 	/** Allocates memory
@@ -83,7 +83,7 @@ public:
 			mbed_stats_heap_get(&heap_stats);
 			post_size = (heap_stats.reserved_size - heap_stats.current_size);
 			#endif
-			DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
+			DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
 		}
         return ptr;
     }
@@ -118,7 +118,7 @@ public:
 			#endif
 			_mtx.unlock();
 		}
-		DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........:", "HEAP_free=%d, Free=%d", post_size, (post_size - prev_size));
+		DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........", "HEAP_free=%d, Free=%d", post_size, (post_size - prev_size));
     }
 private:
     static Mutex _mtx;
