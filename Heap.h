@@ -29,15 +29,16 @@ class Heap{
 public:
 
 	static void printHeap(const char* added_text=""){
-		uint32_t size=0;
+		uint32_t size=0, size_internal=0;
 		#if ESP_PLATFORM == 1
 		size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+		size_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
 		#elif __MBED__==1
 		mbed_stats_heap_t heap_stats;
 		mbed_stats_heap_get(&heap_stats);
 		size = (heap_stats.reserved_size - heap_stats.current_size);
 		#endif
-		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........", "HEAP_free=%d. %s", size, added_text);
+		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........", "HEAP_free=%d. internal_free=%d, %s", size, size_internal, added_text);
 	}
 
 	/** Set debug level
@@ -83,7 +84,6 @@ public:
 			mbed_stats_heap_get(&heap_stats);
 			post_size = (heap_stats.reserved_size - heap_stats.current_size);
 			#endif
-			DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........", "HEAP_free=%d, Alloc=%d", post_size, (prev_size - post_size));
 		}
         return ptr;
     }
@@ -118,7 +118,6 @@ public:
 			#endif
 			_mtx.unlock();
 		}
-		DEBUG_TRACE_I(!IS_ISR(), "[Heap]..........", "HEAP_free=%d, Free=%d", post_size, (post_size - prev_size));
     }
 private:
     static Mutex _mtx;
