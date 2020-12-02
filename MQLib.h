@@ -548,7 +548,7 @@ _subscribe_exit:
     }
 
     /** Máximo tiempo de espera en el mutex antes de crear solicitud pendiente */
-    static const uint32_t DefaultMutexTimeout = 1000;
+    static const uint32_t DefaultMutexTimeout = 3000;
 
 
 private:
