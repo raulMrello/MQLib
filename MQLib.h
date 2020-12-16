@@ -1,22 +1,22 @@
 /*
  * MQLib.h
  *
- *  Versión: 12 Apr 2018
+ *  Versiï¿½n: 12 Apr 2018
  *  Author: raulMrello
  *
  *	-------------------------------------------------------------------------------------------------------------------
  *
  *	Changelog:
- *	- Cambia la descripción de <name> en <struct Topic> para que pase de un <const char*> a un <char*> y que en el servicio
+ *	- Cambia la descripciï¿½n de <name> en <struct Topic> para que pase de un <const char*> a un <char*> y que en el servicio
  *	MQBroker::subscribeReq se reserve espacio para copiar el topic que se desea, de esa forma no es necesario prepararlo
- *	externamente y puede ser liberado insitu por la propia librería MQLib.
+ *	externamente y puede ser liberado insitu por la propia librerï¿½a MQLib.
  *  - @13Abr2018.001 Cambio WildcardScope por WildcardScopeDev, WildcardScopeGroup y AddrField = 2 (antes 1)
- *  - @15Mar2018.001 Añado clase MQBridge para crear redirecciones de forma cómoda
- *  - @06Mar2018.001 Añado lista de operaciones pendientes, así como servicios privados 'addPendingRequest' y
+ *  - @15Mar2018.001 Aï¿½ado clase MQBridge para crear redirecciones de forma cï¿½moda
+ *  - @06Mar2018.001 Aï¿½ado lista de operaciones pendientes, asï¿½ como servicios privados 'addPendingRequest' y
  *  				 'processPendingRequests'. Las esperas en el mutex no son bloqueantes. Esto permite que los suscriptores
- *  				 puedan utilizar la publicación y/o suscripción sin quedarse bloqueados de forma permanente.
- *  - @12Apr2018.001 Añado servicio MQ::MQClient::isTopicRoot
- *  - @05Mar2018.001 verifico wildcards en tokens de cualquier posición (soluciona bug)
+ *  				 puedan utilizar la publicaciï¿½n y/o suscripciï¿½n sin quedarse bloqueados de forma permanente.
+ *  - @12Apr2018.001 Aï¿½ado servicio MQ::MQClient::isTopicRoot
+ *  - @05Mar2018.001 verifico wildcards en tokens de cualquier posiciï¿½n (soluciona bug)
  *  - @21Feb2018.001 en List.hpp sustituyo por getNextItem para asegurar que _search se posiciona correctamente
  *	- @14Feb2018.001: 'name' cambia de const char* a char*
  *	- @14Feb2018.002: se reserva espacio para el nombre del topic
@@ -24,47 +24,47 @@
  *
  *	-------------------------------------------------------------------------------------------------------------------
  *
- *  MQLib es una librería que proporciona capacidades de publicación-suscripción de forma pasiva, sin necesidad de
+ *  MQLib es una librerï¿½a que proporciona capacidades de publicaciï¿½n-suscripciï¿½n de forma pasiva, sin necesidad de
  *	utilizar un thread dedicado y siempre corriendo en el contexto del publicador.
  *
- *	Consta de dos tipos de clases estáticas: MQBroker y MQClient.
+ *	Consta de dos tipos de clases estï¿½ticas: MQBroker y MQClient.
  *
- *	MQBroker: se encarga de gestionar la lista de suscriptores y el paso de mensajes desde los publicadores a éstos.
+ *	MQBroker: se encarga de gestionar la lista de suscriptores y el paso de mensajes desde los publicadores a ï¿½stos.
  *	 Para ello necesita mantener una lista de topics y los suscriptores a cada uno de ellos.
  *
- *	MQClient: se encarga de hacer llegar los mensajes publicados al broker, de forma que éste los procese como corresponda.
+ *	MQClient: se encarga de hacer llegar los mensajes publicados al broker, de forma que ï¿½ste los procese como corresponda.
  *
  *  Los Topics se identifican mediante una cadena de texto separada por tokens '/' que indican el nivel de profundidad
  *  del recurso al que se accede (ej: 'aaa/bbb/ccc/ddd' tiene 4 niveles de profundidad: aaa, bbb, ccc, ddd).
  *
- *  Además cada nivel se identifica mediante un identificador único. Así para el ejemplo anterior, el token 'aaa' tiene un
+ *  Ademï¿½s cada nivel se identifica mediante un identificador ï¿½nico. Asï¿½ para el ejemplo anterior, el token 'aaa' tiene un
  *  identificador, 'bbb' tiene otro, y lo mismo para 'ccc' y 'ddd'.
  *
- *  Esta librería está limitada con unos parámetros por defecto, de forma que encajen en una gran variedad de aplicaciones
- *  sin necesidad de tocar esos parámetros. Sin embargo, podrían modificarse adaptándola a casos especiales. Las limitaciones
- *  son éstas:
+ *  Esta librerï¿½a estï¿½ limitada con unos parï¿½metros por defecto, de forma que encajen en una gran variedad de aplicaciones
+ *  sin necesidad de tocar esos parï¿½metros. Sin embargo, podrï¿½an modificarse adaptï¿½ndola a casos especiales. Las limitaciones
+ *  son ï¿½stas:
  *
  *  Identificador de topic: Variable entera 64-bit (uint64_t)
  *
- *  Relación entre "Identificador de token" vs "Niveles de profundidad"
+ *  Relaciï¿½n entre "Identificador de token" vs "Niveles de profundidad"
  *     TokenId_size vs  NivelesDeProfundidad   
- *      8bit_token  -> 8 niveles (máximo de 256 tokens)
- *      9bit_token  -> 7 niveles (máximo de 512 tokens)
- *      10bit_token -> 6 niveles (máximo de 1024 tokens)
- *      13bit_token -> 5 niveles (máximo de 8192 tokens)
- *      16bit_token -> 4 niveles (máximo de 65536 tokens)
+ *      8bit_token  -> 8 niveles (mï¿½ximo de 256 tokens)
+ *      9bit_token  -> 7 niveles (mï¿½ximo de 512 tokens)
+ *      10bit_token -> 6 niveles (mï¿½ximo de 1024 tokens)
+ *      13bit_token -> 5 niveles (mï¿½ximo de 8192 tokens)
+ *      16bit_token -> 4 niveles (mï¿½ximo de 65536 tokens)
  *
- *  La configuración se selecciona mediante el parámetro MQ_CONFIG_VALUE
+ *  La configuraciï¿½n se selecciona mediante el parï¿½metro MQ_CONFIG_VALUE
  *
- *  Es posible publicar y suscribirse a topics dedicados relativos a un ámbito concreto que se sale de la norma de identificación
- *  de los topics. El wildcard es '@' de esta forma se genera un ámbito "scope" al que se dirige el mensaje. Dicho scope 
- *  está formado por un valor uint32_t.
+ *  Es posible publicar y suscribirse a topics dedicados relativos a un ï¿½mbito concreto que se sale de la norma de identificaciï¿½n
+ *  de los topics. El wildcard es '@' de esta forma se genera un ï¿½mbito "scope" al que se dirige el mensaje. Dicho scope 
+ *  estï¿½ formado por un valor uint32_t.
  *
- *  Por ejemplo para dirigir mensajes concretos al grupo 3, el topic dedicado será de la forma "@group/3/..." O para mensajes
- *  a un dispositivo, por ejemplo el 8976: "@dev/8976/...". De igual forma, se podrán realizar suscripciones, por ejemplo a
+ *  Por ejemplo para dirigir mensajes concretos al grupo 3, el topic dedicado serï¿½ de la forma "@group/3/..." O para mensajes
+ *  a un dispositivo, por ejemplo el 8976: "@dev/8976/...". De igual forma, se podrï¿½n realizar suscripciones, por ejemplo a
  *  todos los topics con destino el grupo 78: "@group/78/#".
  *
- *  En caso de no utilizar el wildcard "scope", su valor será 0 y se considerará un topic general.
+ *  En caso de no utilizar el wildcard "scope", su valor serï¿½ 0 y se considerarï¿½ un topic general.
  *
  */
 
@@ -77,6 +77,7 @@
 #include "List.h"
 #include "Heap.h"
 #include <list>
+#include <vector>
 #include <map>
 
 
@@ -93,7 +94,7 @@ static const uint8_t DefaultMaxTopicNameLength = 64;
 
     
 /** @struct MQ::MAX_TOKEN_LEVEL
- *  @brief Tipo definido para definir la profundidad máxima de los topics
+ *  @brief Tipo definido para definir la profundidad mï¿½xima de los topics
  */
 static const uint8_t MAX_TOKEN_LEVEL = 10;
    
@@ -105,37 +106,37 @@ typedef uint8_t token_t;
     
     
 /** @struct MQ::Token
- *  @brief Tipo definido para la definición de tokens
+ *  @brief Tipo definido para la definiciï¿½n de tokens
  */
 typedef const char* Token;
     
     
 /** @type MQ::SubscribeCallback
- *  @brief Tipo definido para las callbacs de suscripción
+ *  @brief Tipo definido para las callbacs de suscripciï¿½n
  */
 typedef Callback<void(const char* name, void*, uint16_t)> SubscribeCallback;
 
 /** @type MQ::PublishCallback
- *  @brief Tipo definido para las callbacs de publicación
+ *  @brief Tipo definido para las callbacs de publicaciï¿½n
  */
  typedef Callback<void(const char* name, int32_t)> PublishCallback;
 
  /** @type MQ::SubscribeCallback
-  *  @brief Tipo definido para las callbacs de suscripción
+  *  @brief Tipo definido para las callbacs de suscripciï¿½n
   */
  typedef Callback<void(const char* name, void*, uint16_t, PublishCallback*)> BridgeCallback;
 
 /** @enum ErrorResult
- *  @brief Resultados de error generados por la librería
+ *  @brief Resultados de error generados por la librerï¿½a
  */
 enum ErrorResult{
-	SUCCESS = 0,          	///< Operación correcta
+	SUCCESS = 0,          	///< Operaciï¿½n correcta
 	NULL_POINTER,           ///< Fallo por Puntero nulo
-	DEINIT,                 ///< Fallo por no-inicialización
+	DEINIT,                 ///< Fallo por no-inicializaciï¿½n
 	OUT_OF_MEMORY,          ///< Fallo por falta de memoria
 	EXISTS,           		///< Fallo por objeto existente
 	NOT_FOUND,        		///< Fallo por objeto no existente
-    OUT_OF_BOUNDS,          ///< Fallo por exceso de tamaño
+    OUT_OF_BOUNDS,          ///< Fallo por exceso de tamaï¿½o
     LOCK_TIMEOUT,			///< Fallo por timeout en el lock
 };
 	
@@ -172,20 +173,20 @@ class MQBroker {
 public:	    
 
     /** @fn start
-     *  @brief Inicializa el broker MQ estableciendo el número máximo de caracteres en los topics
+     *  @brief Inicializa el broker MQ estableciendo el nï¿½mero mï¿½ximo de caracteres en los topics
      *         Este constructor se utiliza cuando no se proporciona una lista de tokens externa, sino
      *         que se crea conforme se realizan las diferentes suscripciones a topics.
-     *  @param max_len_of_name Número de caracteres máximo que puede tener un topic (incluyendo '\0' final)
-     *  @param wildcard_scope_dev Token para identificador numérico de dispositivo
-     *  @param wildcard_scope_group Token para identificador numérico de grupo
-     *  @param defdbg Flag para activar las trazas de depuración por defecto
-     *  @return Código de error
+     *  @param max_len_of_name Nï¿½mero de caracteres mï¿½ximo que puede tener un topic (incluyendo '\0' final)
+     *  @param wildcard_scope_dev Token para identificador numï¿½rico de dispositivo
+     *  @param wildcard_scope_group Token para identificador numï¿½rico de grupo
+     *  @param defdbg Flag para activar las trazas de depuraciï¿½n por defecto
+     *  @return Cï¿½digo de error
      */
     static int32_t start(uint8_t max_len_of_name, bool defdbg = false){
     	int32_t rc = SUCCESS;
     	_pub_count = 0;
     	_mutex.lock();
-        // ajusto parámetros por defecto 
+        // ajusto parï¿½metros por defecto 
     	setLoggingLevel((defdbg)? ESP_LOG_DEBUG : ESP_LOG_INFO);
     	_defdbg = true;
         _max_name_len = max_len_of_name-1;
@@ -201,8 +202,8 @@ public:
         _pending_list = new List<PendingRequest_t>();
         MBED_ASSERT(_pending_list);
 
-        // si hay un número de tokens mayor que el tamaño que lo puede alojar, devuelve error:
-        // ej: token_count = 500 con token_t = uint8_t, que sólo puede codificar hasta 256 valores.
+        // si hay un nï¿½mero de tokens mayor que el tamaï¿½o que lo puede alojar, devuelve error:
+        // ej: token_count = 500 con token_t = uint8_t, que sï¿½lo puede codificar hasta 256 valores.
         if(((DefaultMaxNumTokenEntries+WildcardCOUNT) >> (8*sizeof(MQ::token_t))) > 1){
             rc = OUT_OF_BOUNDS; goto __start_exit;
         }
@@ -230,7 +231,7 @@ __start_exit:
 
 
     /** @fn ready
-     *  @brief Chequea si el broker está listo para ser usado
+     *  @brief Chequea si el broker estï¿½ listo para ser usado
 	 *	@return True:listo, False:pendiente
      */
     static bool ready() {
@@ -239,7 +240,7 @@ __start_exit:
 
     
     /** @fn subscribeReq
-     *  @brief Recibe una solicitud de suscripción a un topic
+     *  @brief Recibe una solicitud de suscripciï¿½n a un topic
      *  @param name Nombre del topic
      *  @param subscriber Manejador de las actualizaciones del topic
      *  @param use_lock Flag para utilizar el bloqueo por mutex
@@ -250,14 +251,14 @@ __start_exit:
         if(!_topic_list){
             return DEINIT;
         }
-        // si el nombre excede el tamaño máximo, no lo permite
+        // si el nombre excede el tamaï¿½o mï¿½ximo, no lo permite
         if(strlen(name) > _max_name_len){
             return OUT_OF_BOUNDS;
         }
 
-        DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Iniciando suscripción a [%s]", name);
+        DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Iniciando suscripciï¿½n a [%s]", name);
 
-        // Inicia la búsqueda del topic para ver si ya existe
+        // Inicia la bï¿½squeda del topic para ver si ya existe
         if(use_lock){
         	osStatus oss;
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
@@ -272,7 +273,7 @@ __start_exit:
         if(topic){
 			// Chequea si el suscriptor ya existe...
 			MQ::SubscribeCallback *sbc = topic->subscriber_list->searchItem(subscriber);
-			// si no existe, lo añade
+			// si no existe, lo aï¿½ade
 			if(!sbc){
 				err = topic->subscriber_list->addItem(subscriber);
 				goto _subscribe_exit;
@@ -296,7 +297,7 @@ __start_exit:
             err = OUT_OF_MEMORY; goto _subscribe_exit;
         }
         
-        // se fijan los parámetros del token (delimitadores, id, nombre)
+        // se fijan los parï¿½metros del token (delimitadores, id, nombre)
 
         //@14Feb2018.002: se reserva espacio para el nombre del topic
         topic->name = (char*)Heap::memAlloc(strlen(name)+1);
@@ -312,12 +313,12 @@ __start_exit:
             err = OUT_OF_MEMORY; goto _subscribe_exit;
         }
         
-        // y se añade el suscriptor
+        // y se aï¿½ade el suscriptor
         if(topic->subscriber_list->addItem(subscriber) != SUCCESS){
             err = OUT_OF_MEMORY; goto _subscribe_exit;
         }
         
-        // se inserta en el árbol de topics
+        // se inserta en el ï¿½rbol de topics
         err = _topic_list->addItem(topic);
 
 _subscribe_exit:
@@ -330,9 +331,9 @@ _subscribe_exit:
 
 	
     /** @fn unsubscribeReq
-     *  @brief Recibe una solicitud de cancelación de suscripción a un topic
+     *  @brief Recibe una solicitud de cancelaciï¿½n de suscripciï¿½n a un topic
      *  @param name Nombre del topic
-     *  @param subscriber Suscriptor a eliminar de la lista de suscripción
+     *  @param subscriber Suscriptor a eliminar de la lista de suscripciï¿½n
      *  @param use_lock Flag para utilizar el bloqueo por mutex
      *  @return Resultado
      */
@@ -341,13 +342,13 @@ _subscribe_exit:
 		if(!_topic_list){
             return DEINIT;
         }
-        // si el nombre excede el tamaño máximo, no lo permite
+        // si el nombre excede el tamaï¿½o mï¿½ximo, no lo permite
         if(strlen(name) > _max_name_len){
             return OUT_OF_BOUNDS;
         }
 
 
-        // Inicia la búsqueda del topic para ver si ya existe
+        // Inicia la bï¿½squeda del topic para ver si ya existe
         if(use_lock){
         	osStatus oss;
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
@@ -383,11 +384,11 @@ _subscribe_exit:
 	
 	
     /** @fn publishReq
-     *  @brief Recibe una solicitud de publicación a un topic
+     *  @brief Recibe una solicitud de publicaciï¿½n a un topic
      *  @param name Nombre del topic
      *  @param data Mensaje
-     *  @param datasize Tamaño del mensaje
-     *  @param publisher Callback de notificación de la publicación
+     *  @param datasize Tamaï¿½o del mensaje
+     *  @param publisher Callback de notificaciï¿½n de la publicaciï¿½n
      *  @param use_lock Flag para utilizar el bloqueo por mutex
 	 *	@return Resultado
      */
@@ -395,12 +396,12 @@ _subscribe_exit:
     	if(!_topic_list){
             return DEINIT;
         }
-        // si el nombre excede el tamaño máximo, no lo permite
+        // si el nombre excede el tamaï¿½o mï¿½ximo, no lo permite
         if(strlen(name) > _max_name_len){
             return OUT_OF_BOUNDS;
         }
 
-        // Inicia la búsqueda del topic para ver si ya existe
+        // Inicia la bï¿½squeda del topic para ver si ya existe
         if(use_lock){
         	osStatus oss;
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
@@ -442,7 +443,7 @@ _subscribe_exit:
                 // si coinciden, se invoca a todos los suscriptores                
                 MQ::SubscribeCallback *sbc = topic->subscriber_list->getFirstItem();
                 while(sbc){
-                    // restaura el mensaje por si hubiera sufrido modificaciones en algún suscriptor
+                    // restaura el mensaje por si hubiera sufrido modificaciones en algï¿½n suscriptor
                     memcpy(mem_data, data, datasize);
                     DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Notificando topic update de '%s' al suscriptor %x", name, (uint32_t)sbc);
                     notify_subscriber = true;
@@ -454,7 +455,7 @@ _subscribe_exit:
         }
         publisher->call(name, (notify_subscriber)? SUCCESS : NOT_FOUND);
         Heap::memFree(mem_data);
-        DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Fin de la publicación del topic '%s'", name);
+        DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Fin de la publicaciï¿½n del topic '%s'", name);
 
         if(use_lock){
 			_mutex.unlock();
@@ -477,7 +478,7 @@ _subscribe_exit:
     /** @fn getTopicNameReq 
      *  @brief Obtiene el nombre de un topic dado su id y su scope
      *  @param name Recibe el nombre asociado al id
-     *  @param len Tamaño máximo aceptado para el nombre
+     *  @param len Tamaï¿½o mï¿½ximo aceptado para el nombre
      *  @param id Identificador del topic
      */
     static void getTopicNameReq(char* name, uint8_t len, MQ::topic_t* id){
@@ -490,7 +491,7 @@ _subscribe_exit:
 			idex = id->tk[i];
 			// si ha llegado al final del topic, termina
 			if(idex == WildcardNotUsed){
-				// una vez finalizado, debe borrar el último caracter '/' insertado
+				// una vez finalizado, debe borrar el ï¿½ltimo caracter '/' insertado
 				name[strlen(name)-1] = 0;
 				return;
 			}
@@ -507,14 +508,14 @@ _subscribe_exit:
 				strcat(name, "/");
 			}
         }
-        // una vez finalizado, debe borrar el último caracter '/' insertado
+        // una vez finalizado, debe borrar el ï¿½ltimo caracter '/' insertado
         name[strlen(name)-1] = 0;
     }        
 
     
     /** @fn getMaxTopicLenReq 
-     *  @brief Obtiene el número máximo de caracteres que puede tener un topic
-     *  @return Número de caracteres, incluyendo el '\0' final.
+     *  @brief Obtiene el nï¿½mero mï¿½ximo de caracteres que puede tener un topic
+     *  @return Nï¿½mero de caracteres, incluyendo el '\0' final.
      */
     static uint8_t getMaxTopicLenReq(){
         return _max_name_len;
@@ -524,7 +525,7 @@ _subscribe_exit:
     /** @fn getInternalTokenListReq
      *  @brief Obtiene la lista de tokens interna
      *  @param tklist Lista de tokens
-     *  @param tkcount Número de tokens en la lista
+     *  @param tkcount Nï¿½mero de tokens en la lista
      */
     static void getInternalTokenListReq(const char** &tklist, uint32_t &tkcount){
         tklist = _token_provider;
@@ -547,7 +548,7 @@ _subscribe_exit:
     	return false;
     }
 
-    /** Máximo tiempo de espera en el mutex antes de crear solicitud pendiente */
+    /** Mï¿½ximo tiempo de espera en el mutex antes de crear solicitud pendiente */
     static const uint32_t DefaultMutexTimeout = 3000;
 
 
@@ -569,15 +570,15 @@ private:
      *
      */
     enum PendingRequestType {
-    	ReqPublish=0, 	//!< ReqPublish Solicitud de publicación
-		ReqSubscribe,   //!< ReqSubscribe Solicitud de suscripción
-		ReqUnsubscribe, //!< ReqUnsubscribe Solicitud de unsuscripción
+    	ReqPublish=0, 	//!< ReqPublish Solicitud de publicaciï¿½n
+		ReqSubscribe,   //!< ReqSubscribe Solicitud de suscripciï¿½n
+		ReqUnsubscribe, //!< ReqUnsubscribe Solicitud de unsuscripciï¿½n
     };
 
-    /** Máximo número de tokens permitidos en topic provider auto-gestionado */
+    /** Mï¿½ximo nï¿½mero de tokens permitidos en topic provider auto-gestionado */
     static const uint16_t DefaultMaxNumTokenEntries = (256 - WildcardCOUNT);    
 
-    /** Máximo número de topics permitidos */
+    /** Mï¿½ximo nï¿½mero de topics permitidos */
     static const uint16_t DefaultMaxNumTopics = 256;
 
     /** Lista de topics registrados */
@@ -592,10 +593,10 @@ private:
 	/** Mutex */
     static Mutex _mutex;
 
-    /** Límite de tamaño en nombres de topcis */
+    /** Lï¿½mite de tamaï¿½o en nombres de topcis */
     static uint8_t _max_name_len;
  
-    /** Flag de depuración */
+    /** Flag de depuraciï¿½n */
     static bool _defdbg;
 
     /** Estructura de datos de una solicitud pendiente
@@ -615,7 +616,7 @@ private:
 
 
     /** @fn findTopicByName 
-     *  @brief Busca un topic por medio de su nombre, descendiendo por la jerarquía hasta
+     *  @brief Busca un topic por medio de su nombre, descendiendo por la jerarquï¿½a hasta
      *         llegar a un topic final.
      *  @param name nombre
      *  @return Pointer to the topic or NULL if not found
@@ -655,7 +656,7 @@ private:
                     break;
                 }
             }
-            // tras recorrer todo el árbol, si no existe lo añade
+            // tras recorrer todo el ï¿½rbol, si no existe lo aï¿½ade
             if(!exists){
                 char* new_token = (char*)Heap::memAlloc(1+to-from);
                 if(!new_token){
@@ -665,7 +666,7 @@ private:
                 strncpy(new_token, &name[from], (to-from)); new_token[to-from] = 0;
                 _token_provider[_token_provider_count-WildcardCOUNT] = new_token;
                 _token_provider_count++;
-                DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Añadido token %s", new_token);
+                DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Aï¿½adido token %s", new_token);
             }
             from = to+1;
             getNextDelimiter(name, &from, &to, &is_final);
@@ -728,14 +729,14 @@ private:
        
     
     /** @fn getNextDelimiter
-     *  @brief Extrae delimitadores del nombre, token a token, desde la posición "from"
+     *  @brief Extrae delimitadores del nombre, token a token, desde la posiciï¿½n "from"
      *  @param name Nombre del topic a evaluar
-     *  @param from Recibe el delimitador inicial y se usa como punto inicial de búsqueda
+     *  @param from Recibe el delimitador inicial y se usa como punto inicial de bï¿½squeda
      *  @param to Recibe el delimitador final
      *  @param is_final Recibe el flag si es el subtopic final
      */
     static void getNextDelimiter(const char* name, uint8_t* from, uint8_t* to, bool* is_final){
-        // se obtiene el tamaño total del nombre
+        // se obtiene el tamaï¿½o total del nombre
         int len = strlen(name);
         // si el rango es incorrecto, no hace nada
         if(*from >= len){
@@ -744,7 +745,7 @@ private:
             *is_final = true;
             return;
         }
-        // se inicia la búsqueda, si parte de un espaciador, lo descarta
+        // se inicia la bï¿½squeda, si parte de un espaciador, lo descarta
         if(name[*from] == '/'){
             (*from)++;
         }
@@ -761,7 +762,7 @@ private:
                 break;
             }
         }
-        // si el punto final coincide con el tamaño de trama, marca como punto final
+        // si el punto final coincide con el tamaï¿½o de trama, marca como punto final
         if(*to >= len){
             *is_final = true;            
         }
@@ -769,10 +770,10 @@ private:
        
     
     /** @fn matchIds
-     *  @brief Compara dos identificadores. El de búsqueda con el encontrado. Si el encontrado
-     *         contiene wildcards, habrá que tenerlos en cuenta.
+     *  @brief Compara dos identificadores. El de bï¿½squeda con el encontrado. Si el encontrado
+     *         contiene wildcards, habrï¿½ que tenerlos en cuenta.
      *  @param found_id Identificador encontrado
-     *  @param search_id Identificador de búsqueda
+     *  @param search_id Identificador de bï¿½squeda
      *  @return True si encajan, False si no encajan 
      */
     static bool matchIds(MQ::topic_t* found_id, MQ::topic_t* search_id){
@@ -783,7 +784,7 @@ private:
 				return true;
 			}
 
-			// si ha llegado al final de la cadena de búsqueda sin errores, es que coincide...
+			// si ha llegado al final de la cadena de bï¿½squeda sin errores, es que coincide...
 			if(search_id->tk[i] == WildcardNotUsed){
 				if(found_id->tk[i] != WildcardNotUsed)
 					return false;
@@ -802,15 +803,15 @@ private:
     }         
 
 
-    /** Añade una operación a la lista de operaciones pendientes
+    /** Aï¿½ade una operaciï¿½n a la lista de operaciones pendientes
      *
-     *  @param type Tipo de operación
+     *  @param type Tipo de operaciï¿½n
      *  @param topic Nombre del topic
-     *  @param data Datos del mensaje (sólo para publicaciones)
-     *  @param datasize Tamaño de los datos del mensaje (sólo para publicaciones)
-     *  @param pub_cb Callback de publicación
-     *  @param sub_cb Callback de suscripción
-     *  @return Código de error
+     *  @param data Datos del mensaje (sï¿½lo para publicaciones)
+     *  @param datasize Tamaï¿½o de los datos del mensaje (sï¿½lo para publicaciones)
+     *  @param pub_cb Callback de publicaciï¿½n
+     *  @param sub_cb Callback de suscripciï¿½n
+     *  @return Cï¿½digo de error
      */
     static int32_t addPendingRequest(PendingRequestType type, const char* topic, void* data, uint32_t datasize, PublishCallback *pub_cb, SubscribeCallback *sub_cb){
     	PendingRequest_t* req = (PendingRequest_t*)Heap::memAlloc(sizeof(PendingRequest_t));
@@ -829,7 +830,7 @@ private:
     	req->pub_cb = pub_cb;
     	req->sub_cb = sub_cb;
     	req->type = type;
-    	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Añadiendo solicitud pendiente tipo %d en topic %s", (int)req->type, req->topic);
+    	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Aï¿½adiendo solicitud pendiente tipo %d en topic %s", (int)req->type, req->topic);
     	return _pending_list->addItem(req);
     }
 
@@ -864,7 +865,7 @@ private:
     		Heap::memFree(req->topic);
     		_pending_list->removeItem(req);
     		Heap::memFree(req);
-    		// Coge el siguiente elemento que volverá a ser el primero
+    		// Coge el siguiente elemento que volverï¿½ a ser el primero
     		req = _pending_list->getFirstItem();
     	}
     }
@@ -887,7 +888,7 @@ class MQClient{
 public:
     
 	/** @fn subscribe
-     *  @brief Se suscribe a un tipo de topic, realizando una petición al broker
+     *  @brief Se suscribe a un tipo de topic, realizando una peticiï¿½n al broker
      *  @param name Nombre del topic
      *  @param subscriber Manejador de las actualizaciones del topic
      *  @return Resultado
@@ -898,9 +899,9 @@ public:
 
 	
     /** @fn unsubscribe
-     *  @brief Finaliza la suscripción a un topic, realizando una petición al broker
+     *  @brief Finaliza la suscripciï¿½n a un topic, realizando una peticiï¿½n al broker
      *  @param name Nombre del topic
-     *  @param subscriber Suscriptor a eliminar de la lista de suscripción
+     *  @param subscriber Suscriptor a eliminar de la lista de suscripciï¿½n
      *  @return Resultado
      */
     static int32_t unsubscribe (const char* name, MQ::SubscribeCallback *subscriber){
@@ -909,12 +910,12 @@ public:
 	
 		
     /** @fn publish 
-     *  @brief Publica una actualización de un topic, realizando una petición al broker
+     *  @brief Publica una actualizaciï¿½n de un topic, realizando una peticiï¿½n al broker
      *  @param name Nombre del topic
      *  @param data Mensaje
-     *  @param datasize Tamaño del mensaje
-     *  @param publisher Callback de notificación de la publicación
-     *  @param is_bridge Flag que indica si la publicación proviene de un bridge
+     *  @param datasize Tamaï¿½o del mensaje
+     *  @param publisher Callback de notificaciï¿½n de la publicaciï¿½n
+     *  @param is_bridge Flag que indica si la publicaciï¿½n proviene de un bridge
 	 *	@return Resultado
      */
     static int32_t publish (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher){
@@ -928,8 +929,8 @@ public:
      *  @brief Publica un bridge
      *  @param name Nombre del topic
      *  @param data Mensaje
-     *  @param datasize Tamaño del mensaje
-     *  @param publisher Callback de notificación de la publicación
+     *  @param datasize Tamaï¿½o del mensaje
+     *  @param publisher Callback de notificaciï¿½n de la publicaciï¿½n
 	 *	@return Resultado
      */
     static int32_t republish (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher){
@@ -940,7 +941,7 @@ public:
     /** @fn getTopicName 
      *  @brief Obtiene el nombre de un topic dado su id
      *  @param name Recibe el nombre asociado al id
-     *  @param len Tamaño máximo aceptado para el nombre
+     *  @param len Tamaï¿½o mï¿½ximo aceptado para el nombre
      *  @param id Identificador del topic
      */
     static void getTopicName(char *name, uint8_t len, MQ::topic_t* id){
@@ -959,8 +960,8 @@ public:
 
     
     /** @fn getMaxTopicLen 
-     *  @brief Obtiene el número máximo de caracteres que puede tener un topic
-     *  @return Número de caracteres, incluyendo el '\0' final.
+     *  @brief Obtiene el nï¿½mero mï¿½ximo de caracteres que puede tener un topic
+     *  @return Nï¿½mero de caracteres, incluyendo el '\0' final.
      */
     static uint8_t getMaxTopicLen(){
         return MQBroker::getMaxTopicLenReq();
@@ -969,7 +970,7 @@ public:
     
     /** @fn isTokenRoot
      *  @brief Chequea si el topic comienza con un token dado
-     *         "topic/a/b/c" con el token "/c" devolverá True, ya que el topic termina con ese token.
+     *         "topic/a/b/c" con el token "/c" devolverï¿½ True, ya que el topic termina con ese token.
      *  @param topic Topic completo a comparar
      *  @param token token con el que comparar al principio del topic
      *  @return True si coincide, False si no coincide
@@ -980,7 +981,7 @@ public:
 
     /** @fn isTopicToken 
      *  @brief Chequea si el token final de un topic coincide. Por ejemplo al comparar el topic
-     *         "topic/a/b/c" con el token "/c" devolverá True, ya que el topic termina con ese token.
+     *         "topic/a/b/c" con el token "/c" devolverï¿½ True, ya que el topic termina con ese token.
      *  @param topic Topic completo a comparar
      *  @param token token con el que comparar al final del topic
      *  @return True si coincide, False si no coincide
@@ -993,7 +994,7 @@ public:
     /** @fn getInternalTokenListReq
      *  @brief Obtiene la lista de tokens interna
      *  @param tklist Lista de tokens
-     *  @param tkcount Número de tokens en la lista
+     *  @param tkcount Nï¿½mero de tokens en la lista
      */
     static void getInternalTokenList(const char** &tklist, uint32_t &tkcount){
     	MQBroker::getInternalTokenListReq(tklist, tkcount);
@@ -1009,7 +1010,7 @@ public:
     }
 
     /**
-     * Añade un bridge a un topic dado
+     * Aï¿½ade un bridge a un topic dado
      * @param topic Topic origen
      * @param cb Callback para procesar el bridging
      */
@@ -1025,7 +1026,7 @@ public:
     		it->second->push_back(cb);
     		return 0;
     	}
-    	// si no hay ningún elemento en el mapa, con ese topic, lo crea
+    	// si no hay ningï¿½n elemento en el mapa, con ese topic, lo crea
     	std::list<MQ::BridgeCallback*>* bclist = new std::list<MQ::BridgeCallback*>();
     	MBED_ASSERT(bclist);
     	bclist->push_back(cb);
@@ -1061,17 +1062,53 @@ public:
      * Ejecuta un bridge dado si existe
      *  @param name Nombre del topic
      *  @param data Mensaje
-     *  @param datasize Tamaño del mensaje
-     *  @param publisher Callback de notificación de la publicación
+     *  @param datasize Tamaï¿½o del mensaje
+     *  @param publisher Callback de notificaciï¿½n de la publicaciï¿½n
      */
     static void executeBridge(const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher){
-    	std::map<std::string, std::list<MQ::BridgeCallback*>*>::iterator it = _bridges.find(name);
-    	if(it!=_bridges.end()){
-    		for(auto i = it->second->begin(); i != it->second->end(); ++i){
-    			MQ::BridgeCallback* bc = (*i);
-    			bc->call(name, data, datasize, publisher);
-    		}
-    	}
+    	std::string topic(name);
+        std::string delimiter = "/";
+        std::vector<std::string> topicSplit;
+
+        int pos = 0;
+        std::string token;
+        while ((pos = topic.find(delimiter)) != std::string::npos) {
+            token = topic.substr(0, pos);
+            topicSplit.push_back(token);
+            topic.erase(0, pos + delimiter.length());
+            if((pos = topic.find(delimiter)) == std::string::npos)
+                topicSplit.push_back(topic);
+        }
+
+        std::map<std::string, std::list<MQ::BridgeCallback*>*>::iterator it;
+        for ( it = _bridges.begin(); it != _bridges.end(); it++ )
+        {
+            std::string topicB(it->first);
+            std::string token;
+            int topicPos = 0;
+            bool proccess = true;
+            bool defProccess = false;
+            while ((pos = topicB.find(delimiter)) != std::string::npos) {
+                token = topicB.substr(0, pos);
+                if(token.compare("#")==0){
+                    defProccess = true;
+                    break;
+                }
+                else if(topicPos >= topicSplit.size() || (token.compare(topicSplit[topicPos])!=0 && token.compare("+")!=0)){
+                    proccess = false;
+                    break;
+                }
+                topicPos++;
+                topicB.erase(0, pos + delimiter.length());
+            }
+
+            if(defProccess || (proccess && topicPos+1 == topicSplit.size() && (topicB.compare(topicSplit[topicPos])==0 || topicB.compare("+")==0))){
+                for(auto i = it->second->begin(); i != it->second->end(); ++i){
+                    MQ::BridgeCallback* bc = (*i);
+                    bc->call(name, data, datasize, publisher);
+                }
+            }
+        }
     }
 
 
@@ -1172,11 +1209,11 @@ private:
     Mutex _mtx;
 
 
-    /** Suscripción a topics y reenvío
+    /** Suscripciï¿½n a topics y reenvï¿½o
      *
      * @param topic Topic suscrito
      * @param msg Mensaje
-     * @param msg_len Tamaño del mensaje
+     * @param msg_len Tamaï¿½o del mensaje
      */
     virtual void bridgeSubscriptionCb(const char* topic, void* msg, uint16_t msg_len){
 		_mtx.lock();
@@ -1195,7 +1232,7 @@ private:
     }
 
 
-    /** Callback tras publicación del bridging
+    /** Callback tras publicaciï¿½n del bridging
      *
      * @param name Topic name
      * @param result Resultado
