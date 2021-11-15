@@ -28,6 +28,19 @@ using namespace rtos;
 class Heap{
 public:
 
+	static uint32_t getFreeHeap(){
+		uint32_t size=0, size_internal=0;
+		#if ESP_PLATFORM == 1
+		size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+		size_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+		#elif __MBED__==1
+		mbed_stats_heap_t heap_stats;
+		mbed_stats_heap_get(&heap_stats);
+		size = (heap_stats.reserved_size - heap_stats.current_size);
+		#endif
+		return size;
+	}
+
 	static void printHeap(const char* added_text=""){
 		uint32_t size=0, size_internal=0;
 		#if ESP_PLATFORM == 1
