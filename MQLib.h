@@ -407,7 +407,11 @@ _subscribe_exit:
         	osStatus oss;
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
                 if(++errors > 3){
-                    esp_restart();
+				#if ESP_PLATFORM == 1
+				esp_restart();
+				#elif __MBED__ == 1
+				NVIC_SystemReset();
+				#endif
                 }
 				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%d] err=[%d] en topic %s", _pub_count++, oss, name);
 				return LOCK_TIMEOUT;
