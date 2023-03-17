@@ -393,6 +393,7 @@ _subscribe_exit:
 	 *	@return Resultado
      */
     static int32_t publishReq (const char* name, void *data, uint32_t datasize, MQ::PublishCallback *publisher, bool use_lock = true){
+        static int errors=0;
     	if(!_topic_list){
             return DEINIT;
         }
@@ -405,6 +406,13 @@ _subscribe_exit:
         if(use_lock){
         	osStatus oss;
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
+                if(++errors > 3){
+				#if ESP_PLATFORM == 1
+				esp_restart();
+				#elif __MBED__ == 1
+				NVIC_SystemReset();
+				#endif
+                }
 				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%d] err=[%d] en topic %s", _pub_count++, oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
@@ -461,6 +469,7 @@ _subscribe_exit:
 			_mutex.unlock();
 //			processPendingRequests();
 		}
+        errors = 0;
 		return SUCCESS;
     }
 
