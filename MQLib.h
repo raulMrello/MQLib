@@ -408,6 +408,7 @@ _subscribe_exit:
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
                 if(++errors > 3){
 				#if ESP_PLATFORM == 1
+                SaveResetReasonKey("MQLibPublish");
 				esp_restart();
 				#elif __MBED__ == 1
 				NVIC_SystemReset();
