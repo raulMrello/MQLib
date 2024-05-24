@@ -79,6 +79,7 @@
 #include <list>
 #include <vector>
 #include <map>
+#include <string>
 
 
 //------------------------------------------------------------------------------------
@@ -262,7 +263,7 @@ __start_exit:
         if(use_lock){
         	osStatus oss;
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_SUBSCRIBE [%d] en topic %s", oss, name);
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_SUBSCRIBE [%ld] en topic %s", oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqSubscribe, name, NULL, 0, NULL, subscriber);
 			}
@@ -352,7 +353,7 @@ _subscribe_exit:
         if(use_lock){
         	osStatus oss;
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_UNSUBSCRIBE [%d] en topic %s", oss, name);
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_UNSUBSCRIBE [%ld] en topic %s", oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqUnsubscribe, name, NULL, 0, NULL, subscriber);
 			}
@@ -414,13 +415,13 @@ _subscribe_exit:
 				NVIC_SystemReset();
 				#endif
                 }
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%d] err=[%d] en topic %s", _pub_count++, oss, name);
+				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%ld] err=[%ld] en topic %s", _pub_count++, oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
 			}
         }
 
-        DEBUG_TRACE_D(true, "[MQLib].........", "Publicacion [%d] en topic  '%s'", _pub_count++, name);
+        DEBUG_TRACE_D(true, "[MQLib].........", "Publicacion [%ld] en topic  '%s'", _pub_count++, name);
 
         // si la lista de tokens es automantenida, crea los ids de los tokens no existentes
         if(_tokenlist_internal){
@@ -454,7 +455,7 @@ _subscribe_exit:
                 while(sbc){
                     // restaura el mensaje por si hubiera sufrido modificaciones en alg�n suscriptor
                     memcpy(mem_data, data, datasize);
-                    DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Notificando topic update de '%s' al suscriptor %x", name, (uint32_t)sbc);
+                    DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Notificando topic update de '%s' al suscriptor %ld", name, (uint32_t)sbc);
                     notify_subscriber = true;
                     sbc->call(name, mem_data, datasize);
                     sbc = topic->subscriber_list->getNextItem();
@@ -905,6 +906,9 @@ public:
      */
     static int32_t subscribe(const char* name, MQ::SubscribeCallback *subscriber){
 		return MQBroker::subscribeReq(name, subscriber);
+    }
+    static int32_t subscribe(string name, MQ::SubscribeCallback *subscriber){
+		return MQBroker::subscribeReq(name.c_str(), subscriber);
     }
 
 	

@@ -51,7 +51,7 @@ public:
 		mbed_stats_heap_get(&heap_stats);
 		size = (heap_stats.reserved_size - heap_stats.current_size);
 		#endif
-		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........", "HEAP_free=%d. internal_free=%d, %s", size, size_internal, added_text);
+		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........", "HEAP_free=%" PRIu32 ". internal_free=%" PRIu32 ", %s", size, size_internal, added_text);
 	}
 
 	/** Set debug level
