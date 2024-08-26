@@ -721,7 +721,7 @@ private:
 				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando tokenX. Buscando token para delimitadores (%d,%d)", from, to);
 				for(int i=0;i<(_token_provider_count - WildcardCOUNT);i++){
 					// si encuentra el token... actualiza el id
-					if(strncmp(_token_provider[i], &name[from], to-from)==0){
+					if(strncmp(_token_provider[i], &name[from], to-from)==0 && strlen(_token_provider[i]) == (to-from)){
 						DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando tokenX. Encontrado token [%s]", _token_provider[i]);
 						token  = i + WildcardCOUNT;
 						break;
