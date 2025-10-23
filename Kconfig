@@ -1,0 +1,32 @@
+menu "HEAP Configuration"
+
+    config HEAP_ENABLED
+        bool "HEAP Enabled"
+        default y
+
+    choice HEAP_LOG_LEVEL
+        depends on HEAP_ENABLED
+        prompt "Log level for HEAP"
+        default HEAP_LOG_LEVEL_WARN
+
+        config HEAP_LOG_LEVEL_NONE
+            bool "NONE"
+
+        config HEAP_LOG_LEVEL_ERROR
+            bool "ERROR"
+
+        config HEAP_LOG_LEVEL_WARN
+            bool "WARN"
+
+        config HEAP_LOG_LEVEL_INFO
+            bool "INFO"
+
+        config HEAP_LOG_LEVEL_DEBUG
+            bool "DEBUG"
+
+        config HEAP_LOG_LEVEL_VERBOSE
+            bool "VERBOSE"
+
+    endchoice 
+
+endmenu

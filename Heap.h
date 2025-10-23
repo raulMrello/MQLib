@@ -25,6 +25,20 @@ using namespace rtos;
 #include "sdkconfig.h"
 #endif
 
+#ifdef CONFIG_HEAP_LOG_LEVEL_ERROR
+#define HEAP_LOG_LEVEL		ESP_LOG_ERROR
+#elif CONFIG_HEAP_LOG_LEVEL_WARN
+#define HEAP_LOG_LEVEL		ESP_LOG_WARN
+#elif CONFIG_HEAP_LOG_LEVEL_INFO
+#define HEAP_LOG_LEVEL		ESP_LOG_INFO
+#elif CONFIG_HEAP_LOG_LEVEL_DEBUG
+#define HEAP_LOG_LEVEL		ESP_LOG_DEBUG
+#elif CONFIG_HEAP_LOG_LEVEL_VERBOSE
+#define HEAP_LOG_LEVEL		ESP_LOG_VERBOSE
+#else
+#define HEAP_LOG_LEVEL		ESP_LOG_NONE
+#endif
+
 class Heap{
 public:
 
