@@ -79,6 +79,8 @@
 #include <list>
 #include <vector>
 #include <map>
+#include <string>
+#include <inttypes.h>
 
 
 //------------------------------------------------------------------------------------
@@ -262,7 +264,7 @@ __start_exit:
         if(use_lock){
         	osStatus oss;
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_SUBSCRIBE [%d] en topic %s", oss, name);
+                DEBUG_TRACE_E(true,"[MQLib].........", "ERR_SUBSCRIBE [%" PRId32 "] en topic %s", (int32_t)oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqSubscribe, name, NULL, 0, NULL, subscriber);
 			}
@@ -352,7 +354,7 @@ _subscribe_exit:
         if(use_lock){
         	osStatus oss;
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_UNSUBSCRIBE [%d] en topic %s", oss, name);
+                DEBUG_TRACE_E(true,"[MQLib].........", "ERR_UNSUBSCRIBE [%" PRId32 "] en topic %s", (int32_t)oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqUnsubscribe, name, NULL, 0, NULL, subscriber);
 			}
@@ -414,13 +416,13 @@ _subscribe_exit:
 				NVIC_SystemReset();
 				#endif
                 }
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%d] err=[%d] en topic %s", _pub_count++, oss, name);
+                DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%" PRIu32 "] err=[%" PRId32 "] en topic %s", _pub_count++, (int32_t)oss, name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
 			}
         }
 
-        DEBUG_TRACE_D(true, "[MQLib].........", "Publicacion [%d] en topic  '%s'", _pub_count++, name);
+    DEBUG_TRACE_D(true, "[MQLib].........", "Publicacion [%" PRIu32 "] en topic  '%s'", _pub_count++, name);
 
         // si la lista de tokens es automantenida, crea los ids de los tokens no existentes
         if(_tokenlist_internal){
@@ -454,7 +456,7 @@ _subscribe_exit:
                 while(sbc){
                     // restaura el mensaje por si hubiera sufrido modificaciones en alg�n suscriptor
                     memcpy(mem_data, data, datasize);
-                    DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Notificando topic update de '%s' al suscriptor %x", name, (uint32_t)sbc);
+                    DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Notificando topic update de '%s' al suscriptor %p", name, (void*)sbc);
                     notify_subscriber = true;
                     sbc->call(name, mem_data, datasize);
                     sbc = topic->subscriber_list->getNextItem();
@@ -705,20 +707,20 @@ private:
         // obtiene los delimitadores para buscar tokens
         getNextDelimiter(name, &from, &to, &is_final);
         while(from < to){
-        	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando topic [%s], delimitadores (%d,%d)", name, from, to);
+		DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando topic [%s], delimitadores (%" PRIu8 ",%" PRIu8 ")", name, from, to);
             uint32_t token = WildcardInvalid;
 			// @05Mar2018.001 Verifico que sea un wildcard...
 			// chequea si es un wildcard
 			if(strncmp(&name[from], "+", to-from)==0){
-				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (+) en delimitadores (%d,%d)", from, to);
+                DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (+) en delimitadores (%" PRIu8 ",%" PRIu8 ")", from, to);
 				token = WildcardAny;
 			}
 			else if(strncmp(&name[from], "#", to-from)==0){
-				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (#) en delimitadores (%d,%d)", from, to);
+                DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Detectado wildcard (#) en delimitadores (%" PRIu8 ",%" PRIu8 ")", from, to);
 				token = WildcardAll;
 			}
 			else{
-				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando tokenX. Buscando token para delimitadores (%d,%d)", from, to);
+                DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Analizando tokenX. Buscando token para delimitadores (%" PRIu8 ",%" PRIu8 ")", from, to);
 				for(int i=0;i<(_token_provider_count - WildcardCOUNT);i++){
 					// si encuentra el token... actualiza el id
 					if(strncmp(_token_provider[i], &name[from], to-from)==0 && strlen(_token_provider[i]) == (to-from)){
@@ -788,7 +790,7 @@ private:
      */
     static bool matchIds(MQ::topic_t* found_id, MQ::topic_t* search_id){
         for(int i=0;i<MQ::MAX_TOKEN_LEVEL;i++){
-        	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Comparando %d vs %d", found_id->tk[i], search_id->tk[i]);
+		DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Comparando %" PRIu8 " vs %" PRIu8 "", found_id->tk[i], search_id->tk[i]);
 			// si ha encontrado un wildcard All, es que coincide
 			if(found_id->tk[i] == WildcardAll){
 				return true;
@@ -840,7 +842,7 @@ private:
     	req->pub_cb = pub_cb;
     	req->sub_cb = sub_cb;
     	req->type = type;
-    	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "A�adiendo solicitud pendiente tipo %d en topic %s", (int)req->type, req->topic);
+    	DEBUG_TRACE_D(_defdbg,"[MQLib].........", "A�adiendo solicitud pendiente tipo %" PRId32 " en topic %s", (int32_t)req->type, req->topic);
     	return _pending_list->addItem(req);
     }
 
@@ -853,17 +855,17 @@ private:
     	while(req){
     		switch((int)req->type){
     			case ReqSubscribe:{
-    				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando solicitud pendiente tipo Subscribe (%d) en topic %s", (int)req->type, req->topic);
+                    DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando solicitud pendiente tipo Subscribe (%" PRId32 ") en topic %s", (int32_t)req->type, req->topic);
     				subscribeReq(req->topic, req->sub_cb, false);
     				break;
     			}
     			case ReqUnsubscribe:{
-    				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando solicitud pendiente tipo Unsubscribe (%d) en topic %s", (int)req->type, req->topic);
+                    DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando solicitud pendiente tipo Unsubscribe (%" PRId32 ") en topic %s", (int32_t)req->type, req->topic);
     				unsubscribeReq(req->topic, req->sub_cb, false);
     				break;
     			}
     			case ReqPublish:{
-    				DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando solicitud pendiente tipo Publish (%d) en topic %s", (int)req->type, req->topic);
+                    DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Procesando solicitud pendiente tipo Publish (%" PRId32 ") en topic %s", (int32_t)req->type, req->topic);
 					publishReq(req->topic, req->msg, req->msg_len, req->pub_cb, false);
     				break;
     			}
@@ -1123,7 +1125,7 @@ public:
 
 
 private:
-    static std::map<std::string, std::list<MQ::BridgeCallback*>*> _bridges;
+    static map<string, std::list<MQ::BridgeCallback*>*> _bridges;
 
 };
 
