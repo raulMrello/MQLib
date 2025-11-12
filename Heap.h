@@ -46,12 +46,13 @@ public:
 		#if ESP_PLATFORM == 1
 		size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
 		size_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........", "HEAP_free=%d. internal_free=%d internal_th: %d, %s", size, size_internal, heap_caps_get_largest_free_block(portStackMemoryCaps), added_text);
 		#elif __MBED__==1
 		mbed_stats_heap_t heap_stats;
 		mbed_stats_heap_get(&heap_stats);
 		size = (heap_stats.reserved_size - heap_stats.current_size);
-		#endif
 		DEBUG_TRACE_W(!IS_ISR(), "[Heap]..........", "HEAP_free=%d. internal_free=%d, %s", size, size_internal, added_text);
+		#endif
 	}
 
 	/** Set debug level
