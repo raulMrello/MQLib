@@ -79,6 +79,7 @@
 #include <list>
 #include <vector>
 #include <map>
+#include <cstdio>
 
 
 //------------------------------------------------------------------------------------
@@ -408,16 +409,32 @@ _subscribe_exit:
 			if((oss = _mutex.lock(DefaultMutexTimeout)) != osOK){
                 if(++errors > 3){
 				#if ESP_PLATFORM == 1
-                SaveResetReasonKey("MQLibPublish");
+                {
+                    // Guarda el topic que adquirió el mutex y no lo ha liberado.
+                    // Formato: MQLibPublish|<topic_owner>
+                    const char* owner = mutexOwnerTopicBuf();
+                    const char* topic_to_save = (owner && owner[0]) ? owner : name;
+
+                    char rr[64];
+                    memset(rr, 0, sizeof(rr));
+                    static const int kMaxTopic = 48;
+                    snprintf(rr, sizeof(rr), "MQLibPublish|%.*s", kMaxTopic, topic_to_save);
+                    SaveResetReasonKey(rr);
+                }
 				esp_restart();
 				#elif __MBED__ == 1
 				NVIC_SystemReset();
 				#endif
                 }
-				DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%d] err=[%d] en topic %s", _pub_count++, oss, name);
+                DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%d] err=[%d] owner=[%s] req=[%s]", _pub_count++, oss, mutexOwnerTopicBuf(), name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
 			}
+
+            // Mutex adquirido: guardo el topic “owner” para diagnóstico.
+            char* owner = mutexOwnerTopicBuf();
+            memset(owner, 0, 64);
+            snprintf(owner, 64, "%s", name);
         }
 
         DEBUG_TRACE_D(true, "[MQLib].........", "Publicacion [%d] en topic  '%s'", _pub_count++, name);
@@ -467,6 +484,7 @@ _subscribe_exit:
         DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Fin de la publicaci�n del topic '%s'", name);
 
         if(use_lock){
+            memset(mutexOwnerTopicBuf(), 0, 64);
 			_mutex.unlock();
 //			processPendingRequests();
 		}
@@ -563,6 +581,15 @@ _subscribe_exit:
 
 
 private:
+
+    // Buffer global (único) para recordar el último topic que adquirió el mutex.
+    // Se actualiza justo después de adquirir _mutex y se limpia justo antes de liberarlo.
+    // Si algún callback se queda colgado con el mutex cogido, este valor queda “enganchado”
+    // y permite diagnosticar qué publicación/suscripción lo dejó bloqueado.
+    static inline char* mutexOwnerTopicBuf() {
+        static char owner[64] = {0};
+        return owner;
+    }
 	
     /** Contador de publicaciones */
     static uint32_t _pub_count;
