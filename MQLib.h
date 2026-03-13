@@ -415,26 +415,28 @@ _subscribe_exit:
                     const char* owner = mutexOwnerTopicBuf();
                     const char* topic_to_save = (owner && owner[0]) ? owner : name;
 
-                    char rr[64];
-                    memset(rr, 0, sizeof(rr));
-                    static const int kMaxTopic = 48;
-                    snprintf(rr, sizeof(rr), "MQLibPublish|%.*s", kMaxTopic, topic_to_save);
-                    SaveResetReasonKey(rr);
+                    char* reset_reason = createPublishResetReason(topic_to_save);
+                    if (reset_reason) {
+                        SaveResetReasonKey(reset_reason);
+                        Heap::memFree(reset_reason);
+                    }
                 }
 				esp_restart();
 				#elif __MBED__ == 1
 				NVIC_SystemReset();
 				#endif
                 }
-                DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%d] err=[%d] owner=[%s] req=[%s]", _pub_count++, oss, mutexOwnerTopicBuf(), name);
+				const char* owner = mutexOwnerTopicBuf();
+                DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%d] err=[%d] owner=[%s] req=[%s]", _pub_count++, oss, owner ? owner : "", name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
 			}
 
             // Mutex adquirido: guardo el topic “owner” para diagnóstico.
             char* owner = mutexOwnerTopicBuf();
-            memset(owner, 0, 64);
-            snprintf(owner, 64, "%s", name);
+            if (owner) {
+                copyBoundedString(owner, MutexOwnerTopicBufSize, name);
+            }
         }
 
         DEBUG_TRACE_D(true, "[MQLib].........", "Publicacion [%d] en topic  '%s'", _pub_count++, name);
@@ -484,7 +486,10 @@ _subscribe_exit:
         DEBUG_TRACE_D(_defdbg,"[MQLib].........", "Fin de la publicaci�n del topic '%s'", name);
 
         if(use_lock){
-            memset(mutexOwnerTopicBuf(), 0, 64);
+			char* owner = mutexOwnerTopicBuf();
+			if (owner) {
+                memset(owner, 0, MutexOwnerTopicBufSize);
+            }
 			_mutex.unlock();
 //			processPendingRequests();
 		}
@@ -582,12 +587,59 @@ _subscribe_exit:
 
 private:
 
+    static const size_t MutexOwnerTopicBufSize = 64;
+    static const size_t PublishResetReasonTopicMaxLen = 48;
+    static const size_t PublishResetReasonBufSize = 64;
+    static const size_t PublishResetReasonPrefixLen = 13;
+
+    static inline void copyBoundedString(char* dst, size_t dst_size, const char* src) {
+        if (!dst || dst_size == 0) {
+            return;
+        }
+        size_t idx = 0;
+        if (src) {
+            while (idx + 1 < dst_size && src[idx] != 0) {
+                dst[idx] = src[idx];
+                idx++;
+            }
+        }
+        dst[idx] = 0;
+        while (++idx < dst_size) {
+            dst[idx] = 0;
+        }
+    }
+
+    static inline char* createPublishResetReason(const char* topic) {
+        char* reason = (char*)Heap::memAlloc(PublishResetReasonBufSize);
+        if (!reason) {
+            return nullptr;
+        }
+        memset(reason, 0, PublishResetReasonBufSize);
+        memcpy(reason, "MQLibPublish|", PublishResetReasonPrefixLen);
+        if (topic) {
+            size_t idx = 0;
+            while (idx < PublishResetReasonTopicMaxLen && (PublishResetReasonPrefixLen + idx + 1) < PublishResetReasonBufSize && topic[idx] != 0) {
+                reason[PublishResetReasonPrefixLen + idx] = topic[idx];
+                idx++;
+            }
+            reason[PublishResetReasonPrefixLen + idx] = 0;
+        }
+        return reason;
+    }
+
     // Buffer global (único) para recordar el último topic que adquirió el mutex.
     // Se actualiza justo después de adquirir _mutex y se limpia justo antes de liberarlo.
     // Si algún callback se queda colgado con el mutex cogido, este valor queda “enganchado”
     // y permite diagnosticar qué publicación/suscripción lo dejó bloqueado.
     static inline char* mutexOwnerTopicBuf() {
-        static char owner[64] = {0};
+        static char* owner = nullptr;
+        if (!owner) {
+            owner = (char*)Heap::memAlloc(MutexOwnerTopicBufSize);
+            if (!owner) {
+                return nullptr;
+            }
+            memset(owner, 0, MutexOwnerTopicBufSize);
+        }
         return owner;
     }
 	
