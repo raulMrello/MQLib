@@ -429,7 +429,7 @@ _subscribe_exit:
 				#endif
                 }
 				const char* owner = mutexOwnerTopicBuf();
-                DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%" PRIu32 "] err=[%" PRIu32 "] owner=[%s] req=[%s]", _pub_count++, (int32)oss, owner ? owner : "", name);
+                DEBUG_TRACE_E(true,"[MQLib].........", "ERR_PUBLISH id=[%" PRIu32 "] err=[%" PRId32 "] owner=[%s] req=[%s]", _pub_count++, (int32_t)oss, owner ? owner : "", name);
 				return LOCK_TIMEOUT;
 				//return addPendingRequest(ReqPublish, name, data, datasize, publisher, NULL);
 			}
