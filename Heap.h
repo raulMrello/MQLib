@@ -43,10 +43,10 @@ class Heap{
 public:
 
 	static uint32_t getFreeHeap(){
-		uint32_t size=0, size_internal=0;
+		uint32_t size=0;
 		#if ESP_PLATFORM == 1
 		size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-		size_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+		heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
 		#elif __MBED__==1
 		mbed_stats_heap_t heap_stats;
 		mbed_stats_heap_get(&heap_stats);
@@ -84,18 +84,13 @@ public:
 	 * @return pointer to the allocated memory or NULL
 	 */
 	static void* memAlloc(size_t size){
-		uint32_t prev_size=0;
-		uint32_t post_size=0;
 		#if __MBED__==1
 		mbed_stats_heap_t heap_stats;
 		#endif
 		if(!IS_ISR()){
 			_mtx.lock();
-			#if ESP_PLATFORM == 1
-			prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-			#elif __MBED__==1
+			#if __MBED__==1
 			mbed_stats_heap_get(&heap_stats);
-			prev_size = (heap_stats.reserved_size - heap_stats.current_size);
 			#endif
 		}
         void *ptr = malloc(size);
@@ -106,11 +101,8 @@ public:
         }
 		if(!IS_ISR()){
 			_mtx.unlock();
-			#if ESP_PLATFORM == 1
-			post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-			#elif __MBED__==1
+			#if __MBED__==1
 			mbed_stats_heap_get(&heap_stats);
-			post_size = (heap_stats.reserved_size - heap_stats.current_size);
 			#endif
 		}
         return ptr;
@@ -121,28 +113,20 @@ public:
 	 * @param ptr Pointer to release
 	 */
     static void memFree(void* ptr){
-		uint32_t prev_size=0;
-		uint32_t post_size=0;
 		#if __MBED__==1
 		mbed_stats_heap_t heap_stats;
 		#endif
 		if(!IS_ISR()){
 			_mtx.lock();
-			#if ESP_PLATFORM == 1
-			prev_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
 
-			#elif __MBED__==1
+			#if __MBED__==1
 			mbed_stats_heap_get(&heap_stats);
-			prev_size = heap_stats.reserved_size - heap_stats.current_size;
 			#endif
 		}
         free(ptr);
 		if(!IS_ISR()){
-			#if ESP_PLATFORM == 1
-			post_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-			#elif __MBED__==1
+			#if __MBED__==1
 			mbed_stats_heap_get(&heap_stats);
-			post_size = (heap_stats.reserved_size - heap_stats.current_size);
 			#endif
 			_mtx.unlock();
 		}
