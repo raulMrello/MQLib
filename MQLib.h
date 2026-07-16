@@ -417,10 +417,10 @@ _subscribe_exit:
 
                     char* reset_reason = createPublishResetReason(topic_to_save);
                     if (reset_reason) {
-                        firmwareStop(reset_reason, ResetPolicyCount);
+                        firmwareStop(reset_reason);
                     }
                 }
-				firmwareStop("MQLibPublish", ResetPolicyCount);
+				firmwareStop("MQLibPublish");
 				#elif __MBED__ == 1
 				NVIC_SystemReset();
 				#endif
