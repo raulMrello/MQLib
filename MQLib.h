@@ -419,11 +419,10 @@ _subscribe_exit:
 
                     char* reset_reason = createPublishResetReason(topic_to_save);
                     if (reset_reason) {
-                        SaveResetReasonKey(reset_reason);
-                        Heap::memFree(reset_reason);
+                        firmwareStop(reset_reason);
                     }
                 }
-				esp_restart();
+				firmwareStop("MQLibPublish");
 				#elif __MBED__ == 1
 				NVIC_SystemReset();
 				#endif
